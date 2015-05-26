@@ -1,0 +1,77 @@
+#! /bin/sh
+
+# designed by Nobuaki Tounaka
+# written by 321516
+
+# print the usage and exit
+print_usage_and_exit () {
+  cat <<-__USAGE 1>&2
+	Usage   : ${0##*/} <k1> <k2> <file>
+	Version : Fri Feb 13 15:09:43 JST 2015
+	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
+__USAGE
+  exit 1
+}
+
+
+# initialize
+PATH='/usr/bin:/bin'
+export LANG=C
+export LC_ALL=C
+file=''
+
+# parse the arguments
+case $# in [01]) print_usage_and_exit;; esac
+printf '%s\n' "$1" | grep -q '^[0-9]\{1,\}$' || print_usage_and_exit
+stf=$1
+shift
+printf '%s\n' "$1" | grep -q '^[0-9]\{1,\}$' || print_usage_and_exit
+edf=$1
+shift
+case $# in
+  0) file='-'            ;;
+  1) file=$1             ;;
+  *) print_usage_and_exit;;
+esac
+
+# validate the file arguments
+if [ $stf -gt $edf ]; then
+  printf '%s\n' "${0##*/}: <k2> must be grater than <k1> or equal" 1>&2
+  exit 1
+fi
+if [ \( ! -r "$file" \) -a \( "_$file" != '_-' \) ]; then
+  printf '%s\n' "${0##*/}: Cannot open the file" 1>&2
+  exit 1
+fi
+case "$file" in -|/*|./*|../*) :;; *) file="./$file";; esac
+
+# main
+exec awk -v stf=$stf -v edf=$edf '
+BEGIN {
+  key0  = "";   # key of previous line
+  count = 0;    # same key lines counter
+  if (getline) {
+    for (i=stf; i<=edf; i++) {
+      key0 = key0 $i FS;
+    }
+    count++;
+  }
+}
+{
+  key = "";
+  for (i=stf; i<=edf; i++) {
+    key = key $i FS;
+  }
+  if (key != key0) {
+    print key0 count;
+    count = 0;
+  }
+  key0 = key;
+  count++;
+}
+END {
+  if (NR > 0) {
+    print key0 count;
+  }
+}
+' "$file"

@@ -1,0 +1,107 @@
+#! /bin/sh
+
+# designed by Nobuaki Tounaka
+# written by 321516
+
+# print the usage and exit
+print_usage_and_exit () {
+  cat <<-__USAGE 1>&2
+	Usage   : ${0##*/} -<n> <file>
+	          ${0##*/} <n> <file>
+	          ${0##*/} -<n>c <file>
+	Version : Fri Feb 13 15:09:43 JST 2015
+	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
+__USAGE
+  exit 1
+}
+# the alternative of the mktemp command
+type mktemp >/dev/null 2>&1 || {
+  mktemp_fileno=0
+  mktemp() {
+    (
+      mktemp_filename="/tmp/${0##*/}.$$.$mktemp_fileno"
+      mktemp_fileno=$((mktemp_fileno+1))
+      touch "$mktemp_filename"
+      chmod 600 "$mktemp_filename"
+      printf '%s\n' "$mktemp_filename"
+    )
+  }
+}
+
+
+# initialize
+PATH='/usr/bin:/bin'
+export LANG=C
+export LC_ALL=C
+copt=0
+n=0
+file=''
+use_stdin=0
+
+# parse arguments and count lines
+[ $# -gt 0 ] || print_usage_and_exit
+if   printf '%s\n' "$1" | grep -q '^-[0-9]\{1,\}$' ; then
+  n=${1#-}
+  shift
+elif printf '%s\n' "$1" | grep -q '^_[0-9]\{1,\}$' ; then
+  n=$1
+  shift
+elif printf '%s\n' "$1" | grep -q '^-[0-9]\{1,\}c$'; then
+  n=${1#-}; n=${n%c}
+  copt=1
+  shift
+else
+  print_usage_and_exit
+fi
+if   [ $# -eq 0 ]; then
+  file='-'
+elif [ $# -eq 1 ]; then
+  file=$1
+else
+  print_usage_and_exit
+fi
+case "$file" in -|/*|./*|../*) :;; *) file="./$file";; esac
+
+# Is the file a normal file?
+is_normalfile=0
+if   [ -f "$file"                         ]; then
+  is_normalfile=1
+elif [ "_$file" = '_-'                    ]; then
+  is_normalfile=0
+elif [ \( -c "$arg" \) -o \( -p "$arg" \) ]; then
+  is_normalfile=0
+else
+  printf '%s\n' "${0##*/}: Invalid file" 1>&2
+  exit 1
+fi
+if [ $is_normalfile -eq 0 ]; then
+  tmpfile=$(mktemp -t "${0##*/}.XXXXXXXX")
+  if [ $? -eq 0 ]; then
+    trap "rm -f $tmpfile; exit"  EXIT HUP INT QUIT PIPE ALRM TERM
+  else
+    printf '%s\n' "${0##*/}: Cannot create a temporary file" 1>&2
+    exit 1
+  fi
+  cat "$file" > $tmpfile
+  file=$tmpfile
+fi
+
+# count and cut the tail
+if [ $copt -eq 0 ]; then
+  lines=$(sed -n '$=' < "$file")
+  [ -z $lines ] && lines=0
+  if [ $lines -le $n ]; then
+    :
+  else
+    head -n $((lines-n)) "$file"
+  fi
+else
+  size=$(ls -l "$file" | awk '{print $5}')
+  if [ $size -le $n ]; then
+    :
+    exit 0
+  else
+    dd if="$file" count=1 bs=$((size-n)) 2>/dev/null
+    exit $?
+  fi
+fi
