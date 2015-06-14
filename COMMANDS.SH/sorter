@@ -246,23 +246,23 @@ sortrule_a='';sortrule_b='';stablesort='';
 echo "$flds" | grep -q NF || {
   if echo 1 | sort --stable >/dev/null 2>&1; then
     stablesort='Y'
-    sortrule=$(echo "$flds"                   |
-               sed "s/\\\$/${LF}&/g"          |
-               grep '^\$'                     |
-               sed 's/[^0-9$NF-].*$//'        |
-               sed 's/^\$//'                  |
-               sort -n -u                     |
-               awk '{printf("-k %d,%d ",$0);}')
+    sortrule=$(echo "$flds"                      |
+               sed "s/\\\$/${LF}&/g"             |
+               grep '^\$'                        |
+               sed 's/[^0-9$NF-].*$//'           |
+               sed 's/^\$//'                     |
+               sort -n -u                        |
+               awk '{printf("-k %d,%d ",$0,$0);}')
   else
     stablesort='N'
-    sortrule=$(echo "$flds"                        |
-               sed "s/\\\$/${LF}&/g"               |
-               grep '^\$'                          |
-               sed 's/[^0-9$NF-].*$//'             |
-               sed 's/^\$//'                       |
-               sort -n -u                          |
-               awk '   {printf("-k %d,%d ",$0+1);} #
-                    END{printf("-k 1n,1"       );}')
+    sortrule=$(echo "$flds"                             |
+               sed "s/\\\$/${LF}&/g"                    |
+               grep '^\$'                               |
+               sed 's/[^0-9$NF-].*$//'                  |
+               sed 's/^\$//'                            |
+               sort -n -u                               |
+               awk '   {printf("-k %d,%d ",$0+1,$0+1);} #
+                    END{printf("-k 1n,1"            );}')
   fi
 
 }
