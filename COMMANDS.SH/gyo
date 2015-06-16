@@ -7,40 +7,106 @@
 print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 	Usage   : ${0##*/} [-f] <file> ...
-	Version : Tue Oct 14 18:07:19 JST 2014
+	Version : Tue Jun 16 22:13:06 JST 2015
 	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
 __USAGE
   exit 1
 }
-# the alternative of the mktemp command
-which mktemp >/dev/null 2>&1 || {
-  mktemp_fileno=0
-  mktemp() {
-    (
-      mktemp_filename="/tmp/${0##*/}.$$.$mktemp_fileno"
-      mktemp_fileno=$((mktemp_fileno+1))
-      touch "$mktemp_filename"
-      chmod 600 "$mktemp_filename"
-      echo "$mktemp_filename"
-    )
+# the alternative of the "mktemp -t"
+mktempf0() {
+  # --- parameters, etc. ---------------------------------------------
+  num_of_digits=16  # Length of Random String
+  n=10              # Max Times of Retrying
+  chrs='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_'
+                    # Available letters
+  LF=$(printf '\\\n_');LF=${LF%_}
+  # --- call built-in mktemp if exists -------------------------------
+  type mktemp >/dev/null 2>&1 && {
+    mktemp -t tmp.${0##*/}.$$.XXXXXXXXXXXXXXXX
+    return $?
   }
+  # --- set the temporary directory ----------------------------------
+  Dir_tmp=$(set | grep -q ^TMPDIR= | sed 's/^[^=]\{1,\}=//');
+  case "$Dir_tmp" in
+    '') Dir_tmp='/tmp'      ;;
+    /)  Dir_tmp=''          ;;
+    *)  Dir_tmp=${Dir_tmp%/};;
+  esac
+  # --- mktemp loop --------------------------------------------------
+  while [ $n -ge 0 ]; do
+    # --- Generate Ramdom string -------------------------------------
+    # calculate the number of words which required
+    nw=$(echo "${num_of_digits}*l(${#chrs})/11.09+1" | # 11.09=ln(65536)
+         bc -l                                       |
+         sed 's/\..*$//'                             )
+    # make a random hexadecimal digit
+    if [ -c /dev/urandom ]; then
+      hstr=$(dd if=/dev/urandom bs=2 count=$nw 2>/dev/null |
+             od -A n -t x2 -v                              |
+             tr 'abcdef ' 'ABCDEF\n'                       |
+             tr -Cd 0123456789ABCDEF                       )
+    else
+      hstr=$( (ps -Ao pid,etime,pcpu,vsz; date)         |
+             od -t d4 -A n -v                           |
+             sed 's/[^0-9]\{1,\}/'"$LF"'/g'             |
+             grep '[0-9]'                               |
+             tail -n 42                                 |
+             sed 's/.*\(.\{8\}\)$/\1/g'                 |
+             awk 'BEGIN{a=-2147483648;}                 #
+                       {a+=$1;        }                 #
+                  END  {                                #
+                    srand(a);                           #
+                    for(i=0;i<'$nw';i++){               #
+                      printf("%02X",int(rand()*65536)); #
+                    }                                   #
+                  }'                                    )
+    fi
+    # make a random string from the hexadecimal digit
+    s=$(echo "obase=${#chrs};ibase=16;$hstr"                     |
+        bc                                                       |
+        tr -d '\\\n'                                             |
+        tr ' ' '\n'                                              |
+        awk 'BEGIN  {for(i=1;i<'$num_of_digits';i++){print 0;}}  #
+             /[0-9]/{print;                                   }' |
+        awk 'BEGIN  {ORS="";                                     #
+                     s="'"$chrs"'";                              #
+                     for(i=0;i<length(s);i++){                   #
+                       c[i]=substr(s,i+1,1);                     #
+                     }                        }                  #
+             /[0-9]/{print c[$0*1];           }'                 |
+        tail -c $num_of_digits                                   )
+    # --- Making the file path ---------------------------------------
+    Path_target="${Dir_tmp}/tmp.${0##*/}.$$.$s"
+    # --- Making the file --------------------------------------------
+    (set -C; umask 177; : > "$Path_target") 2>/dev/null || {
+      [ -f "$Path_target" ] && { n=$((n-1)); continue; }
+      n=-1; break;
+    }
+    break
+  done
+  # --- print error message when failed to make a file ---------------
+  case "$n" in -1) return 1;; esac
+  # --- print the path of the file -----------------------------------
+  printf '%s\n' "$Path_target"
+  # --- return successfully ------------------------------------------
+  return 0
 }
 
 
 # function for processing a file
 proc_a_file () {
-  local gyo tmpfile reffile 
+  gyo=''; tmpfile=''; reffile=''
 
   # count lines (not adjusted yet)
   if [ $2 -eq 0 ]; then
     gyo=$(wc -l "$1" | awk '{print $1}')
     reffile=$1
   else
-    tmpfile=$(mktemp -t "${name_of_me}.XXXXXXXX")
+    tmpfile=$(mktempf0)
     if [ $? -eq 0 ]; then
       trap "rm -f $tmpfile; exit"  EXIT HUP INT QUIT PIPE ALRM TERM
     else
-      echo "${name_of_me}: Cannot create a temporary file" 1>&2
+      printf '%s: Cannot create a temporary file' "${0##*/}" 1>&2
       exit 1
     fi
     gyo=$(tee "$tmpfile" | wc -l | awk '{print $1}')
@@ -63,17 +129,20 @@ proc_a_file () {
   if [ $foption -eq 0 ]; then
     echo $gyo
   else
-    printf '$s %d' "$1" "$gyo"
+    printf '%s %d\n' "$1" "$gyo"
   fi
 }
 
 
 # initialize
+set -u
+umask 0022
 PATH='/usr/bin:/bin'
+IFS=$(printf ' \t\n_'); IFS=${IFS%_}
+export IFS LANG=C LC_ALL=C PATH
 foption=0
 file=''
 use_stdin=0
-name_of_me=${0##*/}
 
 # parse arguments and count lines
 i=0
@@ -91,7 +160,11 @@ for arg in "$@"; do
          \( "_$arg" = '_/dev/fd/0'       \) -o \
          \( "_$arg" = '_/proc/self/fd/0' \)    ]
   then
-    [ $use_stdin -eq 0 ] || print_usage_and_exit
+    case $use_stdin in [^0]*)
+      printf '%s: stdin can be used only once in the arguments\n ' \
+             "${0##*/}" 1>&2
+      exit 1
+    esac
     is_stdin=1
     readonce=1
     file="$arg"
@@ -104,9 +177,10 @@ for arg in "$@"; do
     print_usage_and_exit
   fi
   if [ \( ! -r "$file" \) -a \( "_$file" != '_-' \) ]; then
-    echo "${0##*/}: Cannot open the file \"$arg\"" 1>&2
+    printf '%s: Cannot open the file "%s"\n' "${0##*/}" "$arg" 1>&2
     exit 1
   fi
+  case "$file" in -|/*|./*|../*) :;; *) file="./$file";; esac
   use_stdin=$((use_stdin+is_stdin))
   #
   # process a file

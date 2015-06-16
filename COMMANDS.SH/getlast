@@ -15,7 +15,11 @@ __USAGE
 
 
 # initialize
+set -u
+umask 0022
 PATH='/usr/bin:/bin'
+IFS=$(printf ' \t\n_'); IFS=${IFS%_}
+export IFS LANG=C LC_ALL=C PATH
 disable_ng='#'
 file=''
 
@@ -26,10 +30,10 @@ if [ "_$1" = "_+ng" ]; then
   shift
 fi
 [ $# -ge 2 ] || print_usage_and_exit
-echo "_$1" | grep '^_[0-9]\{1,\}$' >/dev/null || print_usage_and_exit
+printf '%s\n' "$1" | grep -q '^[0-9]\{1,\}$' || print_usage_and_exit
 stf=$1
 shift
-echo "_$1" | grep '^_[0-9]\{1,\}$' >/dev/null || print_usage_and_exit
+printf '%s\n' "$1" | grep -q '^[0-9]\{1,\}$' || print_usage_and_exit
 edf=$1
 shift
 [ $# -lt 2 ] || print_usage_and_exit
@@ -41,13 +45,14 @@ fi
 
 # validate the file arguments
 if [ $stf -gt $edf ]; then
-  echo "${0##*/}: <k2> must be grater than <k1> or equal" 1>&2
+  printf '%s: <k2> must be grater than <k1> or equal\n' "${0##*/}" 1>&2
   exit 1
 fi
 if [ \( ! -r "$file" \) -a \( "_$file" != '_-' \) ]; then
-  echo "${0##*/}: Cannot open the file" 1>&2
+  printf '%s: Cannot open the file\n' "${0##*/}" 1>&2
   exit 1
 fi
+case "$file" in -|/*|./*|../*) :;; *) file="./$file";; esac
 
 # main
 exec awk -v stf=$stf -v edf=$edf '
