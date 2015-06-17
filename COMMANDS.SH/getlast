@@ -7,7 +7,7 @@
 print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 	Usage   : ${0##*/} [+ng] <k1> <k2> <file>
-	Version : Fri Jun 27 01:06:49 JST 2014
+	Version : Wed Jun 17 22:11:21 JST 2015
 	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
 __USAGE
   exit 1
@@ -52,7 +52,7 @@ if [ \( ! -r "$file" \) -a \( "_$file" != '_-' \) ]; then
   printf '%s: Cannot open the file\n' "${0##*/}" 1>&2
   exit 1
 fi
-case "$file" in -|/*|./*|../*) :;; *) file="./$file";; esac
+case "$file" in ''|-|/*|./*|../*) :;; *) file="./$file";; esac
 
 # main
 exec awk -v stf=$stf -v edf=$edf '

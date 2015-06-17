@@ -9,7 +9,7 @@ print_usage_and_exit () {
 	Usage   : ${0##*/} -<n> <file>
 	          ${0##*/} <n> <file>
 	          ${0##*/} -<n>c <file>
-	Version : Fri Feb 13 15:09:43 JST 2015
+	Version : Wed Jun 17 22:09:01 JST 2015
 	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
 __USAGE
   exit 1
@@ -128,7 +128,7 @@ elif [ $# -eq 1 ]; then
 else
   print_usage_and_exit
 fi
-case "$file" in -|/*|./*|../*) :;; *) file="./$file";; esac
+case "$file" in ''|-|/*|./*|../*) :;; *) file="./$file";; esac
 
 # Is the file a normal file?
 is_normalfile=0

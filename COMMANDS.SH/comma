@@ -8,16 +8,17 @@ print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 	Usage   : ${0##*/} [+<n>h] [-4] <f1> <f2> ... <file>
 	        : ${0##*/} -d[4] <string>
-	Version : Fri Feb 13 15:09:07 JST 2015
+	Version : Wed Jun 17 22:07:58 JST 2015
 	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
 __USAGE
   exit 1
 }
 
 # initialize
+set -u
 PATH='/usr/bin:/bin'
-export LANG=C
-export LC_ALL=C
+IFS=$(printf ' \t\n_'); IFS=${IFS%_}
+export IFS LANG=C LC_ALL=C PATH
 directmode=0
 directstr=''
 awkc0=''
@@ -120,7 +121,7 @@ else
     exit 1
   fi
 fi
-case "$file" in -|/*|./*|../*) :;; *) file="./$file";; esac
+case "$file" in ''|-|/*|./*|../*) :;; *) file="./$file";; esac
 
 # make the part of the awk code
 if [ $all_fields -eq 0 ]; then

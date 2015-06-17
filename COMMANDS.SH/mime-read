@@ -7,7 +7,7 @@
 print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 	Usage   : ${0##*/} [-v] <name> <MIME-file>
-	Version : Mon Jun 15 21:40:22 JST 2015
+	Version : Wed Jun 17 22:13:45 JST 2015
 	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
 	        :   * Although GNU AWK produces better performance than the
 	        :     other AWKs
@@ -202,7 +202,7 @@ elif [ \( ! -f "$mime_file"     \) -a \
 then
   print_usage_and_exit
 fi
-case "$mime_file" in -|/*|./*|../*) :;; *) file="./$mime_file";; esac
+case "$mime_file" in ''|-|/*|./*|../*) :;; *) file="./$mime_file";; esac
 if [ \( ! -r "$mime_file" \) -a \( "_$mime_file" != '_-' \) ]; then
   printf '%s: Cannot open the file\n' "${0##*/}" 1>&2
   exit 1

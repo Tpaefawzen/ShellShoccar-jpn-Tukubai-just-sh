@@ -7,21 +7,23 @@
 print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 	Usage   : ${0##*/} [-d<c>] [-i<string>] [--template <html>] <param_file>
-	Version : Fri Feb 13 15:06:07 JST 2015
+	Version : Wed Jun 17 21:32:19 JST 2015
 	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands/UTF-8)
 __USAGE
   exit 1
 }
 
 # initialize
+set -u
 PATH='/usr/bin:/bin'
-export LANG=C
-export LC_ALL=C
+IFS=$(printf ' \t\n_'); IFS=${IFS%_}
+export IFS LANG=C LC_ALL=C PATH
 dopt=''
 dopt_is_set=0
 iopt=''
 tmplfile=''
 tmplvars=''
+tmpl_file=''
 param_file=''
 use_stdin=0
 LF=$(printf '\134\n_'); LF=${LF%_}
@@ -100,8 +102,8 @@ fi
 if [ $use_stdin -gt 1 ]; then
   print_usage_and_exit
 fi
-case "$tmpl_file"  in -|/*|./*|../*) :;; *)  tmpl_file="./$tmpl_file" ;; esac
-case "$param_file" in -|/*|./*|../*) :;; *) param_file="./$param_file";; esac
+case "$tmpl_file"  in ''|-|/*|./*|../*) :;; *)  tmpl_file="./$tmpl_file" ;; esac
+case "$param_file" in ''|-|/*|./*|../*) :;; *) param_file="./$param_file";; esac
 if [ \( ! -f "$param_file"     \) -a \
      \( ! -c "$param_file"     \) -a \
      \( ! -p "$param_file"     \) -a \
@@ -147,13 +149,14 @@ export v1=$dopt
 export v2=$iopt
 export v3=$dopt_is_set
 export v4=$tmplvars
-cat "$param_file"                                       |
-sed 's/\(%[0-9A-Fa-f][0-9A-Fa-f]\)/'"$LF"'\1'"$LF"'/g'  |
-sed '/^%/y/abcdef/ABCDEF/'                              |
-tr -d '\n'                                              |
-sed 's/%0D%0A/\\n/g'                                    |
-sed 's/&/'"$LF"'/g'                                     |
-sed 's/+/ /'                                            |
+cat "$param_file"                                      |
+sed 's/\(%[0-9A-Fa-f][0-9A-Fa-f]\)/'"$LF"'\1'"$LF"'/g' |
+sed '/^%/y/abcdef/ABCDEF/'                             |
+tr -d '\n'                                             |
+sed 's/%0D%0A/\\n/g'                                   |
+sed 's/&/'"$LF"'/g'                                    |
+sed 's/+/ /'                                           |
+grep '^[^=]\{1,\}='                                    |
 exec awk '
 BEGIN {
   for (i = 0; i < 256; i++) {

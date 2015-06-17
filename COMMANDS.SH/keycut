@@ -10,7 +10,7 @@ print_usage_and_exit () {
 	        : -d delete the key fields from the output file
 	        : -a appending mode
 	        : -z output gzipped files
-	Version : Mon Jun 15 02:34:33 JST 2015
+	Version : Wed Jun 17 22:12:34 JST 2015
 	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands/gzip/UTF-8)
 __USAGE
   exit 1
@@ -98,11 +98,11 @@ mktempd1() {
 
 
 # initialize
+set -u
 PATH='/usr/bin:/bin:/usr/local/bin'
 IFS=$(printf ' \t\n_'); IFS=${IFS%_}
 export IFS LANG=C LC_ALL=C PATH
 umask 0022
-set -u
 LF=$(printf '\\\n_'); LF=${LF%_}
 aopt='>'
 dopt='#'
@@ -172,7 +172,7 @@ elif [ \( ! -f "$file_r"     \) -a \
 then
   print_usage_and_exit
 fi
-case "$file_r" in -|/*|./*|../*) :;; *) file="./$file_r";; esac
+case "$file_r" in ''|-|/*|./*|../*) :;; *) file="./$file_r";; esac
 if [ $zopt -ne 0 ]; then
   type gzip >/dev/null 2>&1
   [ $? -eq 0 ] || {
