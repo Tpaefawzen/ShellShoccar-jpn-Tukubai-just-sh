@@ -9,14 +9,18 @@ print_usage_and_exit () {
 		Usage   : ${0##*/} [-d[<string>]] <template> <data>
 		        : ${0##*/} -l<label> [-d[<string>]] <template> <data>
 		        : ${0##*/} -h<label> [-d[<string>]] <template> <data>
-		Version : Fri Apr 11 15:52:47 JST 2014
+		Version : Thu Jun 18 23:25:33 JST 2015
 		        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
 __USAGE
   exit 1
 }
 
 # Initialize
+set -u
+umask 0022
 PATH='/usr/bin:/bin'
+IFS=$(printf ' \t\n_'); IFS=${IFS%_}
+export IFS LANG=C LC_ALL=C PATH
 
 # parse the arguments
 mode='p' # "p" (default) or "r" or "l" or "h"
@@ -81,13 +85,15 @@ for file in "$file_tmpl" "$file_data"; do
 done
 [ $use_stdin -le 1 ] || print_usage_and_exit
 if [ \( ! -r "$file_tmpl" \) -a \( "_$file_tmpl" != '_-' \) ]; then
-  echo "${0##*/}: Cannot open the template file" 1>&2
+  printf '%s: Cannot open the template file\n' "${0##*/}" 1>&2
   exit 1
 fi
 if [ \( ! -r "$file_data" \) -a \( "_$file_data" != '_-' \) ]; then
-  echo "${0##*/}: Cannot open the data file" 1>&2
+  printf '%s: Cannot open the data file\n' "${0##*/}" 1>&2
   exit 1
 fi
+case "$file_tmpl" in ''|-|/*|./*|../*) :;; *) file="./$file_tmpl";; esac
+case "$file_data" in ''|-|/*|./*|../*) :;; *) file="./$file_data";; esac
 
 # main
 case $mode in
