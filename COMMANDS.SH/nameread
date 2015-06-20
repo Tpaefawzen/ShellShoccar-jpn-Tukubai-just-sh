@@ -7,14 +7,18 @@
 print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 	Usage   : ${0##*/} [-el] [-d<c>] [-i<string>] <name> <name_file>
-	Version : Fri Jun 27 03:03:38 JST 2014
+	Version : Sat Jun 20 00:25:35 JST 2015
 	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
 __USAGE
   exit 1
 }
 
 # initialize
+set -u
+umask 0022
 PATH='/usr/bin:/bin'
+IFS=$(printf ' \t\n_'); IFS=${IFS%_}
+export IFS LANG=C LC_ALL=C PATH
 dopt=''
 dopt_is_set=0
 iopt=''
@@ -22,6 +26,7 @@ eopt_is_set=0
 lopt_is_set=0
 name=''
 name_file=''
+TAB=$(printf '\t')
 
 # parse arguments
 [ $# -ge 1 ] || print_usage_and_exit
@@ -113,9 +118,10 @@ then
   print_usage_and_exit
 fi
 if [ \( ! -r "$name_file" \) -a \( "_$name_file" != '_-' \) ]; then
-  echo "${0##*/}: Cannot open the file" 1>&2
+  printf '%s: Cannot open the file\n' "${0##*/}" 1>&2
   exit 1
 fi
+case "$name_file" in ''|-|/*|./*|../*) :;; *) file="./$name_file";; esac
 
 #
 awk_code='
@@ -161,12 +167,12 @@ if [ $eopt_is_set -eq 0 ]; then
   exec awk "$awk_code" "$name_file"
 else
   if [ "_${name#^}" = "_$name" ]; then
-    name="[^[:blank:]]*${name}"
+    name="[^$TAB ]*${name}"
   else
     name="${name#^}"
   fi
   if [ "_${name%$}" = "_$name" ]; then
-    name="${name}[^[:blank:]]*"
+    name="${name}[^$TAB ]*"
   else
     name="${name%$}"
   fi
@@ -176,6 +182,6 @@ else
   export v4=$dopt_is_set
   export v5=$lopt_is_set
   export v6=$eopt_is_set
-  grep -E "^${name}([[:blank:]]+.*|)$" "$name_file" |
+  grep -E "^${name}([$TAB ]+.*|)\$" "$name_file" |
   exec awk "$awk_code"
 fi

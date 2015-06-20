@@ -7,53 +7,60 @@
 print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 	Usage   : ${0##*/} [-d[<string>]] <file>
-	Version : Fri Jun 27 03:09:40 JST 2014
+	Version : Sun Jun 21 00:16:41 JST 2015
 	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
 __USAGE
   exit 1
 }
 
 # initialize
+set -u
+umask 0022
 PATH='/usr/bin:/bin'
+IFS=$(printf ' \t\n_'); IFS=${IFS%_}
+export IFS LANG=C LC_ALL=C PATH
 dummy_fldstr=''
 file=''
 
 # parse the arguments
-case "$1" in
-  -d*)
-    dummy_fldstr=${1#-d}
-    if [ "_$dummy_fldstr" = '_' ]; then
-      dummy_fldstr='*'
-    fi
-    shift
-    ;;
+[ $# -gt 0 ] && {
+  case "$1" in
+    -d*) dummy_fldstr=${1#-d}
+         case "$dummy_fldstr" in '') dummy_fldstr='*';; esac
+         shift
+         ;;
+  esac
+}
+case $# in
+  0) file='-'                                                   ;;
+  1) [ \( -f "$1" \) -o \( -c "$1" \) -o \( -p "$1" \) -o \
+       \( "_$1" = '_-' \)                                 ] && {
+       file="$1"
+     }                                                          ;;
+  *) print_usage_and_exit                                       ;;
 esac
-if [ \( -f "$1" \) -o \( -c "$1" \) -o \( -p "$1" \) -o \
-     \( "_$1" = '_-' \)                                 ]; then
-  file="$1"
-elif [ $# -lt 1 ]; then
-  file='-'
-else
-  print_usage_and_exit
-fi
 if [ \( ! -r "$file" \) -a \( "_$file" != '_-' \) ]; then
-  echo "${0##*/}: Cannot open the file" 1>&2
+  printf '%s: Cannot open the file\n' "${0##*/}" 1>&2
   exit 1
 fi
+case "$file" in ''|-|/*|./*|../*) :;; *) file="./$file";; esac
 
 # transpose the table
+export v0=${0##*/}
 export v1=$dummy_fldstr
 exec awk '
 BEGIN {
   max_nf = 0;
+  myname       = ENVIRON["v0"];
   dummy_fldstr = ENVIRON["v1"];
+  errmsg       = "There is a line which has a differnt number of fields.";
   _assert_exit = 0;
 }
 
 {
   if (NF > max_nf) {
     if ((NR > 1) && (length(dummy_fldstr) == 0)) {
-      print "'"${0##*/}"': There is a line which has a differnt number of fields." > "/dev/stderr";
+      printf("%s: %s\n", myname, errmsg) > "/dev/stderr";
       _assert_exit = 1;
       exit _assert_exit;
     }
@@ -70,7 +77,7 @@ BEGIN {
   }
   if (NF < max_nf) {
     if (length(dummy_fldstr) == 0) {
-      print "'"${0##*/}"': There is a line which has a differnt number of fields." > "/dev/stderr";
+      printf("%s: %s\n", myname, errmsg) > "/dev/stderr";
       _assert_exit = 1;
       exit _assert_exit;
     }

@@ -7,7 +7,7 @@
 print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 	Usage   : ${0##*/} <n1> <n2> ...
-	Version : Fri Jun 27 01:20:04 JST 2014
+	Version : Sat Jun 20 00:30:58 JST 2015
 	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
 __USAGE
   exit 1
@@ -15,7 +15,11 @@ __USAGE
 
 
 # initialize
+set -u
+umask 0022
 PATH='/usr/bin:/bin'
+IFS=$(printf ' \t\n_'); IFS=${IFS%_}
+export IFS LANG=C LC_ALL=C PATH
 
 # parse arguments
 if [ $# -eq 0 ]; then
@@ -23,8 +27,7 @@ if [ $# -eq 0 ]; then
 fi
 formula=''
 for arg in "$@"; do
-  if echo "_$arg" | grep -E '^_-?([0-9]+|[0-9]*\.[0-9]*)$' > /dev/null
-  then
+  if printf '%s\n' "$arg" | grep -Eq '^-?([0-9]+|[0-9]*\.[0-9]*)$'; then
     formula="$formula + $arg"
   else
     print_usage_and_exit
