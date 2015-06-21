@@ -7,7 +7,7 @@
 print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 	Usage   : ${0##*/} [+count] <k1> <k2> <s1> <s2> <file>
-	Version : Sat Jun 20 23:30:41 JST 2015
+	Version : Mon Jun 22 02:08:51 JST 2015
 	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
 __USAGE
   exit 1
@@ -25,6 +25,7 @@ k1=''; k2=''; s1=''; s2=''
 file=''
 
 # parse the arguments
+case $#   in        0) print_usage_and_exit;; esac
 case "$1" in '+count') count=1;shift       ;; esac
 case $#   in   [0123]) print_usage_and_exit;; esac
 printf '%s' "$1" | grep -Eq '^([0-9]+|NF(-[0-9]+)?)$' || print_usage_and_exit
