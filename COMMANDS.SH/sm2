@@ -80,6 +80,7 @@ esac
 export myname=${0##*/}
 exec awk -v addcountfield=$count '
 BEGIN {
+  nf0  = -1;
   key0 = "";
   split("", sum);
   samekeylines = 0;
@@ -87,7 +88,7 @@ BEGIN {
   ORS="";
 }
 
-NR==1  {nf0=NF;}
+nf0<0  {nf0=NF;}
 NF!=nf0{
   msg = "%s: A record which has different number of fields was found. Abort!\n";
   printf(msg , ENVIRON["myname"]) > "/dev/stderr";
@@ -98,13 +99,13 @@ NF!=nf0{
   if ('$s1'>'$s2') {e='$s1';s='$s2'} else {s='$s1';e='$s2'}
   key = '"$keyfileds"';
   if (key == key0) {
-    for (i = s; i <= e; i++) {sum[i] += $i;}
     samekeylines++;
+    for (i = s; i <= e; i++) {sum[i] += $i;}
   } else {
     print_smrecord();
-    for (i = s; i <= e; i++) {sum[i]  = $i;}
-    samekeylines = 1;
     key0 = key;
+    samekeylines = 1;
+    for (i = s; i <= e; i++) {sum[i]  = $i;}
   }
 }
 
