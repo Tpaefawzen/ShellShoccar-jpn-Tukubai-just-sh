@@ -1,0 +1,227 @@
+#! /bin/sh
+
+# designed by Nobuaki Tounaka
+# written by 321516
+
+# print the usage and exit
+print_usage_and_exit () {
+  cat <<-__USAGE 1>&2
+	Usage   : ${0##*/} [+<n>h] <k1> <k2> <d1> <d2> <s1> <s2> <file>
+	Version : Mon Jun 22 03:37:59 JST 2015
+	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands/UTF-8)
+__USAGE
+  exit 1
+}
+
+
+# initialize
+set -u
+umask 0022
+PATH='/usr/bin:/bin'
+IFS=$(printf ' \t\n_'); IFS=${IFS%_}
+export IFS LANG=C LC_ALL=C PATH
+hopt=0
+dis_dx=''; ena_dx='#'
+k1=''; k2=''; d1=''; d2=''; s1=''; s2=''
+file=''
+
+# parse the arguments
+case $#   in        0) print_usage_and_exit;; esac
+printf '%s\n' "$1" | grep -q '^+[0-9]*h$' && {
+  hopt=${1#+}; hopt=${hopt%h}
+  case "$hopt" in '') hopt=1;; esac
+  hopt=$(expr $hopt + 0)
+  shift
+}
+case $# in [012345]) print_usage_and_exit;; esac
+printf '%s' "$1" | grep -Eq '^([0-9]+|NF(-[0-9]+)?)$'   || print_usage_and_exit
+printf '%s' "$2" | grep -Eq '^([0-9]+|NF(-[0-9]+)?)$'   || print_usage_and_exit
+printf '%s' "$3" | grep -Eq '^([0-9]+|NF(-[0-9]+)?|x)$' || print_usage_and_exit
+printf '%s' "$4" | grep -Eq '^([0-9]+|NF(-[0-9]+)?|x)$' || print_usage_and_exit
+printf '%s' "$5" | grep -Eq '^([0-9]+|NF(-[0-9]+)?)$'   || print_usage_and_exit
+printf '%s' "$6" | grep -Eq '^([0-9]+|NF(-[0-9]+)?)$'   || print_usage_and_exit
+case "$3$4" in
+   'xx') dis_dx='#'; ena_dx='';;
+  *'x'*) print_usage_and_exit ;;
+esac
+echo "$1" | grep -q '^0\{1,\}$' && print_usage_and_exit
+echo "$2" | grep -q '^0\{1,\}$' && print_usage_and_exit
+echo "$3" | grep -q '^0\{1,\}$' && print_usage_and_exit
+echo "$4" | grep -q '^0\{1,\}$' && print_usage_and_exit
+echo "$5" | grep -q '^0\{1,\}$' && print_usage_and_exit
+echo "$6" | grep -q '^0\{1,\}$' && print_usage_and_exit
+k1=$1; k2=$2; d1=$3; d2=$4; s1=$5; s2=$6
+shift 6
+case $# in
+  0) file='-'                                                         ;;
+  1) file=$1
+     [ \( -f "$file" \) -o \( -c "$file" \) -o \( -p "$file" \) ] || {
+       print_usage_and_exit
+     }                                                                ;;
+  *) print_usage_and_exit                                             ;;
+esac
+[ \( -r "$file" \) -o \( "_$file" = '_-' \) ] || {
+  printf '%s: Cannot open the file\n' "${0##*/}" 1>&2
+  exit 1
+}
+case "$file" in ''|-|/*|./*|../*) :;; *) file="./$file";; esac
+
+
+# generate the awkcode of making keystring
+case "${s1%NF*}${s2%NF*}" in
+  "$s1$s2") keyfileds=$(awk -v s=$k1 -v e=$k2 '                          #
+                          BEGIN{if((s==0)&&(e==0)){print "\"\"";exit;}   #
+                                if( s>e          ){i=e; e=s; s=i;    }   #
+                                for(i=s;i<=e;i++ ){printf("$%d",i)   }}' |
+                        sed 's/\([0-9]\)\$/\1 FS $/g'                    )
+            ;;
+  '')       k1=$((0${k1#NF})); k2=$((0${k2#NF}))
+            keyfileds=$(awk -v s=$k1 -v e=$k2 '                          #
+                          BEGIN{if(s>e){i=e;e=s;s=i;}                    #
+                                for(i=s;i<=e;i++){printf("$(NF%d)",i)}}' |
+                        sed 's/)$/) FS $/g'                              |
+                        sed 's/(NF0)/NF/g'                               )
+            ;;
+  *)        keyfileds=$(printf 'getfldclstr(%s,%s)' "$k1" "$k2")
+            ;;
+esac
+
+
+# sum-up
+export myname=${0##*/}
+exec awk -v hdr_skip=$hopt '
+BEGIN {
+  for (i=0; i<hdr_skip; i++) {
+    if (getline line) {
+      print line;
+    } else {
+      exit;
+    }
+  }
+  nf0  = -1;
+  key0 = "";
+  split("", sum   );
+  split("", maxlen);
+  dummyflds_str = "";
+  _assert_exit = 0;
+  ORS="";
+}
+
+NR==1  {nf0=NF;}
+NF!=nf0{
+  msg = "%s: A record which has different number of fields was found. Abort!\n";
+  printf(msg , ENVIRON["myname"]) > "/dev/stderr";
+  _assert_exit = 1;
+  exit;
+}
+{
+  if (dummyflds_str == "") {
+    '"$ena_dx"'if ('$k1'>'$k2') {k2='$k1';k1='$k2'} else {k1='$k1';k2='$k2'}
+    '"$ena_dx"'for (i=k1; i<=k2; i++) {
+    '"$ena_dx"'  l1 = utf8strlen($i); l2 = (i in maxlen)?maxlen[i]:0;
+    '"$ena_dx"'  if (l1>l2) {maxlen[i] = l1;}
+    '"$ena_dx"'}
+    '"$dis_dx"'if ('$d1'>'$d2') {d2='$d1';d1='$d2'} else {d1='$d1';d2='$d2'}
+    '"$dis_dx"'for (i=d1; i<=d2; i++) {
+    '"$dis_dx"'  l1 = utf8strlen($i); l2 = (i in maxlen)?maxlen[i]:0;
+    '"$dis_dx"'  if (l1>l2) {maxlen[i] = l1;}
+    '"$dis_dx"'}
+  }
+  if ('$s1'>'$s2') {s2='$s1';s1='$s2'} else {s1='$s1';s2='$s2'}
+  key = '"$keyfileds"';
+  if (key == key0) {
+    '"$dis_dx"'no_sum = 0;
+    '"$dis_dx"'for (i = d1; i<=d2; i++) {if(!match($i,/[^@]/)){no_sum=1;break;}}
+    '"$dis_dx"'if (! no_sum) {
+      for (i = s1; i <= s2; i++) {sum[i] += $i;}
+    '"$dis_dx"'}
+  } else {
+    print_smrecord();
+    key0 = key;
+    '"$dis_dx"'no_sum = 0;
+    '"$dis_dx"'for (i = d1; i<=d2; i++) {if(!match($i,/[^@]/)){no_sum=1;break;}}
+    '"$dis_dx"'if (! no_sum) {
+      for (i = s1; i <= s2; i++) {sum[i]  = $i;}
+    '"$dis_dx"'}
+  }
+  print key;
+  '"$dis_dx"'for (i=d1; i<=d2; i++) {print FS $i;}
+  for (i=s1; i<=s2; i++) {print FS $i;}
+  print "\n";
+}
+
+END {
+  if (_assert_exit) {exit _assert_exit;}
+  print_smrecord();
+}
+
+function print_smrecord() {
+  if (key0 == "") {return;}
+  if (dummyflds_str == "") {
+    '"$ena_dx"'for (i = k1; i <= k1; i++) {
+    '"$ena_dx"'  s = sprintf("%0" maxlen[i] "d",0);
+    '"$ena_dx"'  gsub(/0/, "@", s);
+    '"$ena_dx"'  dummyflds_str = s;
+    '"$ena_dx"'}
+    '"$ena_dx"'for (      ; i <= k2; i++) {
+    '"$ena_dx"'  s = sprintf("%0" maxlen[i] "d",0);
+    '"$ena_dx"'  gsub(/0/, "@", s);
+    '"$ena_dx"'  dummyflds_str = dummyflds_str FS s;
+    '"$ena_dx"'}
+    '"$dis_dx"'for (i = d1; i <= d2; i++) {
+    '"$dis_dx"'  s = sprintf("%0" maxlen[i] "d",0);
+    '"$dis_dx"'  gsub(/0/, "@", s);
+    '"$dis_dx"'  dummyflds_str = dummyflds_str FS s;
+    '"$dis_dx"'}
+    dummyf_avail = 1;
+  }
+  '"$dis_dx"'print key0;
+  print dummyflds_str;
+  for (i = s1; i <= s2; i++) {print FS sum[i];}
+  print "\n";
+}
+
+function getfldclstr(fldnum1,fldnum2 ,i,str) {
+  str = $fldnum1;
+  if (fldnum1 <= fldnum2) {
+    for (i=fldnum1+1;i<=fldnum2;i++) {
+      str = str FS $i;
+    }
+  } else {
+    for (i=fldnum1-1;i>=fldnum2;i--) {
+      str = str FS $i;
+    }
+  }
+  return str;
+}
+
+# strlen for UTF-8 (main)
+function utf8strlen(str, len,i,l1,l2,l3) {
+  len = 0;
+  for (i = 1; i <= length(str); i++) {
+    len++;
+    l1=substr(str, i, 1);
+    if        (l1 < "\200") {       continue;
+    } else if (l1 < "\300") {len--; continue;
+    } else if (l1 < "\340") {i++;
+    } else if (l1 < "\360") {
+      if (l1 == "\357") {
+        l2 = substr(str, i+1, 1);
+        if (l2 == "\275") {
+          l3 = substr(str, i+2, 1);
+          if ((l3 >= "\240") && (l3 < "\300")) {len--;}
+        } else if (l2 == "\276") {
+          l3 = substr(str, i+2, 1);
+          if ((l3 >= "\200") && (l3 < "\240")) {len--;}
+        }
+      }
+      i += 2;
+    } else if (l1 < "\370") {i += 3;
+    } else if (l1 < "\374") {i += 4;
+    } else if (l1 < "\376") {i += 5;
+    } else                  {len-- ; continue;}
+    len++;
+  }
+  return len;
+}
+' "$file"
