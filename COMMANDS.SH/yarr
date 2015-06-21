@@ -7,7 +7,7 @@
 print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 		Usage   : ${0##*/} [-<n>] [-d[<string>]] [num=<n>] <file>
-		Version : Sat Jun 20 23:47:27 JST 2015
+		Version : Mon Jun 22 01:40:20 JST 2015
 		        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
 __USAGE
   exit 1
@@ -84,7 +84,6 @@ BEGIN {
   num  = ENVIRON["v2"];
   d    = ENVIRON["v3"];
   ORS  = "";
-  LF   = sprintf("\n");
   idx0 = " ";
   idx  = "";
   dlmr = "";
@@ -110,7 +109,7 @@ BEGIN {
       print dlmr idx;
       dlm  = "";
     }
-    dlmr = LF;
+    dlmr = "\n";
     print dlm $i;
     dlm = d;
     cnt--;

@@ -7,7 +7,7 @@
 print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 		Usage   : ${0##*/} [-<n>] [-d[<string>]] [num=<n>] <file>
-		Version : Sat Jun 20 23:45:11 JST 2015
+		Version : Mon Jun 22 01:36:59 JST 2015
 		        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
 __USAGE
   exit 1
@@ -84,7 +84,6 @@ BEGIN {
   num = ENVIRON["v2"];
   d   = ENVIRON["v3"];
   ORS = "";
-  LF  = sprintf("\n");
 }
 {
   # ===== make the index string ====================================
@@ -106,7 +105,7 @@ BEGIN {
         print dlm $j;
         dlm = OFS;
       }
-      print LF;
+      print "\n";
     }
   } else {
     # --- case #2 (with -d option) ---------------------------------
@@ -125,7 +124,7 @@ BEGIN {
         print dlm fld[j];
         dlm = OFS;
       }
-      print LF;
+      print "\n";
     }
   }
 }' "$file"

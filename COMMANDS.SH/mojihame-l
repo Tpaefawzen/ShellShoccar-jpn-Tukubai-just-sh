@@ -7,7 +7,7 @@
 print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 		Usage   : ${0##*/} [-l<label>] [-d[<string>]] <template> <data>
-		Version : Thu Jun 18 23:29:39 JST 2015
+		Version : Mon Jun 22 01:31:35 JST 2015
 		        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
 __USAGE
   exit 1
@@ -101,10 +101,6 @@ BEGIN {
   #
   OFS="";
   ORS="";
-  TAB = sprintf("\t");
-  TABn= sprintf("\tn");
-  TABt= sprintf("\tt");
-  LF  = sprintf("\n");
   file_tmpl = (ENVIRON["v1"]!="-") ? ENVIRON["v1"] : "/dev/stdin";
   label     = ENVIRON["v2"];
   asnull    = ENVIRON["v3"];
@@ -115,7 +111,7 @@ BEGIN {
   if (label != "") {
     while (getline line < file_tmpl) {
       if (index(line, label)) {break;}
-      print line, LF;
+      print line, "\n";
     }
   }
 
@@ -135,15 +131,15 @@ BEGIN {
       if (s == asnull) {
         s = "";
       } else {
-        gsub(/\\\\/, LF  , s); # The Rule of Premutation
-        gsub(/\\_/ , TAB , s); # -----------------------
-        gsub(/_/   , " " , s); #   "_"    ->   " "
-        gsub(/\t/  , "_" , s); #   "\_"   ->   "_"
-        gsub(/\\t/ , TABt, s); #
-        gsub(/\\n/ , TABn, s); #
-        gsub(/\n/  , "\\", s); #   "\\"   ->   "\"
-        gsub(/\tn/ , LF  , s); #   "\n"   ->   "<LF>"
-        gsub(/\tt/ , TAB , s); #   "\t"   ->   "<TAB>"
+        gsub(/\\\\/, "\n" , s); # The Rule of Premutation
+        gsub(/\\_/ , "\t" , s); # -----------------------
+        gsub(/_/   , " "  , s); #   "_"    ->   " "
+        gsub(/\t/  , "_"  , s); #   "\_"   ->   "_"
+        gsub(/\\t/ , "\tt", s); #
+        gsub(/\\n/ , "\tn", s); #
+        gsub(/\n/  , "\\" , s); #   "\\"   ->   "\"
+        gsub(/\tn/ , "\n" , s); #   "\n"   ->   "<LF>"
+        gsub(/\tt/ , "\t" , s); #   "\t"   ->   "<TAB>"
       }
       data_buf[i] = s;
     }
@@ -157,14 +153,14 @@ BEGIN {
         print (fieldnum in data_buf) ? data_buf[fieldnum] : "%" fieldnum;
         line = substr(line, RSTART+RLENGTH);
       }
-      print line, LF;
+      print line, "\n";
     }
   }
 
   # ===== Pass through the lines again ===============================
   #
   while (getline line < file_tmpl) {
-    print line, LF;
+    print line, "\n";
   }
 
 }

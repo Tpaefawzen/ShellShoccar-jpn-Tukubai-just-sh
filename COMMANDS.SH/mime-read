@@ -7,7 +7,7 @@
 print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 	Usage   : ${0##*/} [-v] <name> <MIME-file>
-	Version : Wed Jun 17 22:13:45 JST 2015
+	Version : Mon Jun 22 01:25:17 JST 2015
 	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
 	        :   * Although GNU AWK produces better performance than the
 	        :     other AWKs
@@ -213,7 +213,7 @@ while :; do
   CMD_AWK=$(which gawk 2>/dev/null)
   [ $? -eq 0 ] && break
   CMD_AWK=$(which awk 2>/dev/null)
-  [ $($CMD_AWK 'BEGIN{print length(sprintf("\000"))}') -eq 1 ] && break
+  [ $($CMD_AWK 'BEGIN{print length("\000")}') -eq 1 ] && break
   binarable_awk=0; break
 done
 if [ $binarable_awk -eq 0 ]; then
@@ -232,9 +232,6 @@ BEGIN {
   ORS = ""  ;
   _assert_exit = 0;
 
-  cr   = sprintf("\r"  );
-  lf   = sprintf("\n"  );
-  crlf = sprintf("\r\n");
   dlm = "/";
 
   wantedname = ENVIRON["v1"];
@@ -279,7 +276,7 @@ BEGIN {
     if (! match(line, /\r$/)) {
       if (status == 11) {
         '$novopt$nobawk'print prefix, line;
-        '$novopt$nobawk'prefix = lf;
+        '$novopt$nobawk'prefix = "\n";
       }
     # B. the CR+LF terminated and status==11 line
     #    -> must be in body (wanted)
@@ -297,7 +294,7 @@ BEGIN {
         status = 10;
       } else {
         '$novopt$nobawk'print prefix, substr(line, 1, length(line)-1);
-        '$novopt$nobawk'prefix = crlf;
+        '$novopt$nobawk'prefix = "\r\n";
       }
     # C. the CR+LF terminated and status==10 line
     #     -> must be in body (not wanted)
@@ -413,13 +410,13 @@ BEGIN {
       }
       # D4. Other headers
       #     -> do nothing
-      '$vopt'print numofboundaries, " ", line, lf;
+      '$vopt'print numofboundaries, " ", line, "\n";
     }
   }
 }
 END {
   if (_assert_exit) {
-    print "'"${0##*/}"': This is not a MIME data", lf > "/dev/stderr";
+    print "'"${0##*/}"': This is not a MIME data", "\n" > "/dev/stderr";
     exit _assert_exit;
   }
 }
@@ -429,8 +426,8 @@ function down_to_the_child() {
   # "boundary" as the name of the child
   depth++;
   namebros[depth]  = dlm;
-  boundstr1[depth] = "--" boundary sprintf("\r");
-  boundstr2[depth] = "--" boundary sprintf("--\r");
+  boundstr1[depth] = "--" boundary "\r";
+  boundstr2[depth] = "--" boundary "--\r";
   boundary         = "";
 }
 function up_to_the_parent() {
