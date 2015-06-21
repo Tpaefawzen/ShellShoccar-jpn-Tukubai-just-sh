@@ -7,7 +7,7 @@
 print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 	Usage   : ${0##*/} [+<n>h] <k1> <k2> <d1> <d2> <s1> <s2> <file>
-	Version : Mon Jun 22 03:37:59 JST 2015
+	Version : Mon Jun 22 04:49:22 JST 2015
 	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands/UTF-8)
 __USAGE
   exit 1
@@ -107,7 +107,7 @@ BEGIN {
   ORS="";
 }
 
-NR==1  {nf0=NF;}
+nf0<0  {nf0=NF;}
 NF!=nf0{
   msg = "%s: A record which has different number of fields was found. Abort!\n";
   printf(msg , ENVIRON["myname"]) > "/dev/stderr";
