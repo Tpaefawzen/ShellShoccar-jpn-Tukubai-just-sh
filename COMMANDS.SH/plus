@@ -7,7 +7,7 @@
 print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 	Usage   : ${0##*/} <n1> <n2> ...
-	Version : Sat Jun 20 00:30:58 JST 2015
+	Version : Mon Jun 22 18:44:17 JST 2015
 	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
 __USAGE
   exit 1
@@ -22,25 +22,21 @@ IFS=$(printf ' \t\n_'); IFS=${IFS%_}
 export IFS LANG=C LC_ALL=C PATH
 
 # parse arguments
-if [ $# -eq 0 ]; then
-  print_usage_and_exit
-fi
-formula=''
-for arg in "$@"; do
-  if printf '%s\n' "$arg" | grep -Eq '^-?([0-9]+|[0-9]*\.[0-9]*)$'; then
-    formula="$formula + $arg"
-  else
-    print_usage_and_exit
-  fi
-done
+case $# in 0) print_usage_and_exit;; esac
 
-# plus
-result=$(echo "${formula# + }" | bc | tr -d '\\\n')
-if [ "${result#.}" != "$result" ]; then
-  echo "0$result"
-elif [ "${result#-.}" != "$result" ]; then
-  echo "-0${result#-}"
-else
-  echo $result
-fi
-exit 0
+# make the formula
+formula=$(printf '%s ' "$*"                   |
+          tr '\t\n' '  '                      |
+          grep -v '[^0-9.+-]'                 |
+          sed 's/([^ ]\{1,\}) \{,1\}/(\1)+/g' |
+          sed 's/+$//'                        )
+case "$formula" in '') print_usage_and_exit;; esac
+
+# calculating
+awk "BEGIN{print $formula;}" 2>/dev/null
+
+# exit
+case $? in
+  0) exit 0;;
+  *) print_usage_and_exit;;
+esac
