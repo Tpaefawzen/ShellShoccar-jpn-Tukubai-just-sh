@@ -7,7 +7,7 @@
 print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 	Usage   : ${0##*/} [+count] <k1> <k2> <s1> <s2> <file>
-	Version : Mon Jun 22 03:37:48 JST 2015
+	Version : Mon Jun 22 16:51:27 JST 2015
 	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
 __USAGE
   exit 1
@@ -42,12 +42,13 @@ echo "$4" | grep -q '^0\{1,\}$' && print_usage_and_exit
 k1=$1; k2=$2; s1=$3; s2=$4
 shift 4
 case $# in
-  0) file='-'                                                         ;;
+  0) file='-'                                                            ;;
   1) file=$1
-     [ \( -f "$file" \) -o \( -c "$file" \) -o \( -p "$file" \) ] || {
+     [ \( -f "$file" \) -o \( -c "$file" \) -o \( -p "$file" \) -o \
+       \( "_$file" = '_-' \)                                       ] || {
        print_usage_and_exit
-     }                                                                ;;
-  *) print_usage_and_exit                                             ;;
+     }                                                                   ;;
+  *) print_usage_and_exit                                                ;;
 esac
 [ \( -r "$file" \) -o \( "_$file" = '_-' \) ] || {
   printf '%s: Cannot open the file\n' "${0##*/}" 1>&2
@@ -88,7 +89,10 @@ BEGIN {
   ORS="";
 }
 
-nf0<0  {nf0=NF;}
+nf0<0  {
+  nf0=NF;
+  if ('$s1'>'$s2') {s2='$s1';s1='$s2'} else {s1='$s1';s2='$s2'}
+}
 NF!=nf0{
   msg = "%s: A record which has different number of fields was found. Abort!\n";
   printf(msg , ENVIRON["myname"]) > "/dev/stderr";
@@ -96,16 +100,15 @@ NF!=nf0{
   exit;
 }
 {
-  if ('$s1'>'$s2') {e='$s1';s='$s2'} else {s='$s1';e='$s2'}
   key = '"$keyfileds"';
   if (key == key0) {
     samekeylines++;
-    for (i = s; i <= e; i++) {sum[i] += $i;}
+    for (i = s1; i <= s2; i++) {sum[i] += $i;}
   } else {
     print_smrecord();
     key0 = key;
     samekeylines = 1;
-    for (i = s; i <= e; i++) {sum[i]  = $i;}
+    for (i = s1; i <= s2; i++) {sum[i]  = $i;}
   }
 }
 
@@ -118,16 +121,16 @@ function print_smrecord() {
   if (samekeylines==0) {return;}
   if (key0 == "") {
     if (addcountfield) {
-                                print    samekeylines;
-      for (i = s; i <= e; i++) {print FS sum[i]      ;}
+                                  print    samekeylines;
+      for (i = s1; i <= s2; i++) {print FS sum[i]      ;}
     } else             {
-      for (i = s; i <= s; i++) {print    sum[i]      ;}
-      for (     ; i <= e; i++) {print FS sum[i]      ;}
+      for (i = s1; i <= s1; i++) {print    sum[i]      ;}
+      for (      ; i <= s2; i++) {print FS sum[i]      ;}
     }
   } else          {
-                              print    key0           ;
-    if (addcountfield)       {print FS samekeylines   ;}
-    for (i = s; i <= e; i++) {print FS sum[i]         ;}
+                                print    key0           ;
+    if (addcountfield)         {print FS samekeylines   ;}
+    for (i = s1; i <= s2; i++) {print FS sum[i]         ;}
   }
   printf("\n");
 }

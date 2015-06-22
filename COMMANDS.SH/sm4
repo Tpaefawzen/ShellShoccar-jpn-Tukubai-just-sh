@@ -7,7 +7,7 @@
 print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 	Usage   : ${0##*/} [+<n>h] <k1> <k2> <d1> <d2> <s1> <s2> <file>
-	Version : Mon Jun 22 04:49:22 JST 2015
+	Version : Mon Jun 22 16:50:59 JST 2015
 	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands/UTF-8)
 __USAGE
   exit 1
@@ -53,12 +53,13 @@ echo "$6" | grep -q '^0\{1,\}$' && print_usage_and_exit
 k1=$1; k2=$2; d1=$3; d2=$4; s1=$5; s2=$6
 shift 6
 case $# in
-  0) file='-'                                                         ;;
+  0) file='-'                                                            ;;
   1) file=$1
-     [ \( -f "$file" \) -o \( -c "$file" \) -o \( -p "$file" \) ] || {
+     [ \( -f "$file" \) -o \( -c "$file" \) -o \( -p "$file" \) -o \
+       \( "_$file" = '_-' \)                                       ] || {
        print_usage_and_exit
-     }                                                                ;;
-  *) print_usage_and_exit                                             ;;
+     }                                                                   ;;
+  *) print_usage_and_exit                                                ;;
 esac
 [ \( -r "$file" \) -o \( "_$file" = '_-' \) ] || {
   printf '%s: Cannot open the file\n' "${0##*/}" 1>&2
@@ -107,7 +108,29 @@ BEGIN {
   ORS="";
 }
 
-nf0<0  {nf0=NF;}
+nf0<0  {
+  nf0=NF;
+  '"$ena_dx"'if ('$k1'>'$k2') {k2='$k1';k1='$k2'} else {k1='$k1';k2='$k2'}
+  '"$ena_dx"'for (i=k1; i<=k2; i++) {maxlen[i] = utf8strlen($i);}
+  '"$ena_dx"'for (i = k1; i <= k1; i++) {
+  '"$ena_dx"'  s = sprintf("%0" maxlen[i] "d",0);
+  '"$ena_dx"'  gsub(/0/, "@", s);
+  '"$ena_dx"'  dummyflds_str = s;
+  '"$ena_dx"'}
+  '"$ena_dx"'for (      ; i <= k2; i++) {
+  '"$ena_dx"'  s = sprintf("%0" maxlen[i] "d",0);
+  '"$ena_dx"'  gsub(/0/, "@", s);
+  '"$ena_dx"'  dummyflds_str = dummyflds_str FS s;
+  '"$ena_dx"'}
+  '"$dis_dx"'if ('$d1'>'$d2') {d2='$d1';d1='$d2'} else {d1='$d1';d2='$d2'}
+  '"$dis_dx"'for (i=d1; i<=d2; i++) {maxlen[i] = utf8strlen($i);}
+  '"$dis_dx"'for (i = d1; i <= d2; i++) {
+  '"$dis_dx"'  s = sprintf("%0" maxlen[i] "d",0);
+  '"$dis_dx"'  gsub(/0/, "@", s);
+  '"$dis_dx"'  dummyflds_str = dummyflds_str FS s;
+  '"$dis_dx"'}
+  if ('$s1'>'$s2') {s2='$s1';s1='$s2'} else {s1='$s1';s2='$s2'}
+}
 NF!=nf0{
   msg = "%s: A record which has different number of fields was found. Abort!\n";
   printf(msg , ENVIRON["myname"]) > "/dev/stderr";
@@ -115,19 +138,6 @@ NF!=nf0{
   exit;
 }
 {
-  if (dummyflds_str == "") {
-    '"$ena_dx"'if ('$k1'>'$k2') {k2='$k1';k1='$k2'} else {k1='$k1';k2='$k2'}
-    '"$ena_dx"'for (i=k1; i<=k2; i++) {
-    '"$ena_dx"'  l1 = utf8strlen($i); l2 = (i in maxlen)?maxlen[i]:0;
-    '"$ena_dx"'  if (l1>l2) {maxlen[i] = l1;}
-    '"$ena_dx"'}
-    '"$dis_dx"'if ('$d1'>'$d2') {d2='$d1';d1='$d2'} else {d1='$d1';d2='$d2'}
-    '"$dis_dx"'for (i=d1; i<=d2; i++) {
-    '"$dis_dx"'  l1 = utf8strlen($i); l2 = (i in maxlen)?maxlen[i]:0;
-    '"$dis_dx"'  if (l1>l2) {maxlen[i] = l1;}
-    '"$dis_dx"'}
-  }
-  if ('$s1'>'$s2') {s2='$s1';s1='$s2'} else {s1='$s1';s2='$s2'}
   key = '"$keyfileds"';
   if (key == key0) {
     '"$dis_dx"'no_sum = 0;
@@ -157,24 +167,6 @@ END {
 
 function print_smrecord() {
   if (key0 == "") {return;}
-  if (dummyflds_str == "") {
-    '"$ena_dx"'for (i = k1; i <= k1; i++) {
-    '"$ena_dx"'  s = sprintf("%0" maxlen[i] "d",0);
-    '"$ena_dx"'  gsub(/0/, "@", s);
-    '"$ena_dx"'  dummyflds_str = s;
-    '"$ena_dx"'}
-    '"$ena_dx"'for (      ; i <= k2; i++) {
-    '"$ena_dx"'  s = sprintf("%0" maxlen[i] "d",0);
-    '"$ena_dx"'  gsub(/0/, "@", s);
-    '"$ena_dx"'  dummyflds_str = dummyflds_str FS s;
-    '"$ena_dx"'}
-    '"$dis_dx"'for (i = d1; i <= d2; i++) {
-    '"$dis_dx"'  s = sprintf("%0" maxlen[i] "d",0);
-    '"$dis_dx"'  gsub(/0/, "@", s);
-    '"$dis_dx"'  dummyflds_str = dummyflds_str FS s;
-    '"$dis_dx"'}
-    dummyf_avail = 1;
-  }
   '"$dis_dx"'print key0;
   print dummyflds_str;
   for (i = s1; i <= s2; i++) {print FS sum[i];}
