@@ -1,0 +1,65 @@
+#! /bin/sh
+
+# designed by Nobuaki Tounaka
+# written by 321516
+
+# print the usage and exit
+print_usage_and_exit () {
+  cat <<-__USAGE 1>&2
+	Usage   : ${0##*/} [-<n>] <file1> <file2> ...
+	Version : Mon Jun 22 19:14:11 JST 2015
+	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
+__USAGE
+  exit 1
+}
+
+
+# initialize
+set -u
+umask 0022
+PATH='/usr/bin:/bin'
+IFS=$(printf ' \t\n_'); IFS=${IFS%_}
+export IFS LANG=C LC_ALL=C PATH
+numoption=0
+filenames=''
+use_stdin=0
+
+
+# parse arguments
+case $# in 0) print_usage_and_exit;; esac
+printf '%s\n' "$1" | grep -q '^-[0-9]\{1,\}$' && {
+  numoption=${1#-}
+  numoption=$((numoption+0))
+  shift
+}
+
+
+# tcat
+i=0
+for arg in "$@"; do
+  i=$((i+1))
+  if [ \( "_$arg" = '_-'               \) -o \
+       \( "_$arg" = '_/dev/stdin'      \) -o \
+       \( "_$arg" = '_/dev/fd/0'       \) -o \
+       \( "_$arg" = '_/proc/self/fd/0' \)    ]
+  then
+    case $use_stdin in [^0]*) print_usage_and_exit;; esac
+    use_stdin=1
+  elif [ \( -f "$arg" \) -o \( -c "$arg" \) -o \( -p "$arg" \) ]; then
+    file=$arg
+    if [ ! -r "$file" ]; then
+      printf '%s: Cannot open the file "%s"\n' "${0##*/}" "$arg" 1>&2
+      exit 1
+    fi
+  else
+    print_usage_and_exit
+  fi
+  case "$file" in ''|-|/*|./*|../*) :;; *) file="./$file";; esac
+
+  grep ^ "$file"
+  case $i in $#) break;; esac
+  case $numoption in
+    0) :                                     ;;
+    *) printf "%0${numoption}d" 0 | tr 0 '\n';;
+  esac
+done
