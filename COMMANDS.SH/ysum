@@ -7,7 +7,7 @@
 print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 		Usage   : ${0##*/} [+<n>h] [num=<n>] <file>
-		Version : Mon Jun 22 18:20:26 JST 2015
+		Version : Thu Jun 25 05:14:54 JST 2015
 		        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
 __USAGE
   exit 1
@@ -25,41 +25,44 @@ hopt=0
 numopt=0
 numopt_is_set=0
 file=''
-i=0
-for arg in "$@"; do
-  i=$((i+1))
-  case $arg in
-    -[0-9]*)
-      printf '%s\n' "${arg#-}" | grep -q '^[0-9]\{1,\}$'
-      [ $? -eq 0 ] || print_usage_and_exit
-      if [ $n_is_set -eq 0 ]; then
-        n=${arg#-}
-        n_is_set=1
-        continue
-      fi
-      ;;
-    num=[0-9]*)
-      printf '%s\n' "${arg#num=}" | grep -q '^[0-9]\{1,\}$'
-      [ $? -eq 0 ] || print_usage_and_exit
-      if [ $numopt_is_set -eq 0 ]; then
-        numopt=${arg#num=}
-        numopt_is_set=1
-        continue
-      fi
-      ;;
-    +h*)
-      printf '%s\n' "$1" | grep -q '^+[0-9]*h$' || print_usage_and_exit
-      hopt=${1#+}; hopt=${hopt%h}
-      case "$hopt" in '') hopt=1;; esac
-      hopt=$(expr $hopt + 0)
-      ;;
-    -h|--help|--version)
-      print_usage_and_exit
-      ;;
-  esac
-  [ $i -eq $# ] || print_usage_and_exit
-  file=$arg
-done
+case $# in [^0]*)
+  i=0
+  for arg in "$@"; do
+    i=$((i+1))
+    case $arg in
+      -[0-9]*)
+        printf '%s\n' "${arg#-}" | grep -q '^[0-9]\{1,\}$'
+        [ $? -eq 0 ] || print_usage_and_exit
+        if [ $n_is_set -eq 0 ]; then
+          n=${arg#-}
+          n_is_set=1
+          continue
+        fi
+        ;;
+      num=[0-9]*)
+        printf '%s\n' "${arg#num=}" | grep -q '^[0-9]\{1,\}$'
+        [ $? -eq 0 ] || print_usage_and_exit
+        if [ $numopt_is_set -eq 0 ]; then
+          numopt=${arg#num=}
+          numopt_is_set=1
+          continue
+        fi
+        ;;
+      +h*)
+        printf '%s\n' "$1" | grep -q '^+[0-9]*h$' || print_usage_and_exit
+        hopt=${1#+}; hopt=${hopt%h}
+        case "$hopt" in '') hopt=1;; esac
+        hopt=$(expr $hopt + 0)
+        ;;
+      -h|--help|--version)
+        print_usage_and_exit
+        ;;
+    esac
+    [ $i -eq $# ] || print_usage_and_exit
+    file=$arg
+  done
+  ;;
+esac
 case "$file" in '') file='-';; esac
 
 # validate the file arguments

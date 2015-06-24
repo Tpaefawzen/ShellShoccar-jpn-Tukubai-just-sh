@@ -7,7 +7,7 @@
 print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 	Usage   : ${0##*/} key=<key> <master> <tran>
-	Version : Mon Jun 22 01:39:42 JST 2015
+	Version : Thu Jun 25 05:11:16 JST 2015
 	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands/UTF-8)
 __USAGE
   exit 1
@@ -34,6 +34,7 @@ tranfile=''
 
 
 # validate the arguments
+case $# in [01]) print_usage_and_exit;; esac
 for arg in "$@"; do
   case "$arg" in
     key=*)

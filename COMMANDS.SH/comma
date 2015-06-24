@@ -8,7 +8,7 @@ print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 	Usage   : ${0##*/} [+<n>h] [-4] <f1> <f2> ... <file>
 	        : ${0##*/} -d[4] <string>
-	Version : Wed Jun 17 22:07:58 JST 2015
+	Version : Thu Jun 25 04:54:27 JST 2015
 	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
 __USAGE
   exit 1
@@ -31,6 +31,7 @@ digits=3
 hopt=0
 
 # parse the arguments
+case $# in 0) print_usage_and_exit;; esac
 i=0
 for arg in "$@"; do
   i=$((i+1))

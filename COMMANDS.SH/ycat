@@ -126,60 +126,63 @@ mktemp_instead_of_stdin () {
     exit 1
   fi
 }
-i=0
-for arg in "$@"; do
-  i=$((i+1))
-  case $i in
-    1) printf '%s\n' "$arg" | grep -q '^-[0-9]\{1,\}$' && {
-         numoption=${arg#-}
-         continue
-       }
-       ;;
-  esac
-  if [ \( "_$arg" = '_-'               \) -o \
-       \( "_$arg" = '_/dev/stdin'      \) -o \
-       \( "_$arg" = '_/dev/fd/0'       \) -o \
-       \( "_$arg" = '_/proc/self/fd/0' \)    ]
-  then
-    case $use_stdin in [^0]*) print_usage_and_exit;; esac
-    use_stdin=1
-    mktemp_instead_of_stdin
-    file=$tmpfile
-  elif [ \( -f "$arg" \) -o \( -c "$arg" \) -o \( -p "$arg" \) ]; then
-    str=$(printf '%s' "$arg" |
-          od -v -A n -t x1   |
-          tr -d ' \n'        )
-    if   echo "$hexed_filelist_readonce" | grep -Fq " $str "; then
-      printf '%s: Must not be set an irregular file two times\n' "${0##*/}" 1>&2
-      exit 1
-    elif echo "$hexed_filelist"          | grep -Fq " $str "; then
-      tmpfile=$(mktempf0)
-      if [ $? -eq 0 ]; then
-        tmpfiles="$tmpfiles $tmpfile"
-        trap "rm -f $tmpfiles; exit" EXIT HUP INT QUIT PIPE ALRM TERM
-        ln -fs "$arg" "$tmpfile"
-      else
-        printf '%s: Cannot create a temporary file\n' "${0##*/}" 1>&2
-        exit 1
-      fi
+case $# in [^0]*)
+  i=0
+  for arg in "$@"; do
+    i=$((i+1))
+    case $i in
+      1) printf '%s\n' "$arg" | grep -q '^-[0-9]\{1,\}$' && {
+           numoption=${arg#-}
+           continue
+         }
+         ;;
+    esac
+    if [ \( "_$arg" = '_-'               \) -o \
+         \( "_$arg" = '_/dev/stdin'      \) -o \
+         \( "_$arg" = '_/dev/fd/0'       \) -o \
+         \( "_$arg" = '_/proc/self/fd/0' \)    ]
+    then
+      case $use_stdin in [^0]*) print_usage_and_exit;; esac
+      use_stdin=1
+      mktemp_instead_of_stdin
       file=$tmpfile
-    elif [ -f "$arg" ]; then
-      hexed_filelist="$hexed_filelist$str "
-      file=$arg
+    elif [ \( -f "$arg" \) -o \( -c "$arg" \) -o \( -p "$arg" \) ]; then
+      str=$(printf '%s' "$arg" |
+            od -v -A n -t x1   |
+            tr -d ' \n'        )
+      if   echo "$hexed_filelist_readonce" | grep -Fq " $str "; then
+        printf '%s: Must not be set an irregular file two times\n' "${0##*/}" 1>&2
+        exit 1
+      elif echo "$hexed_filelist"          | grep -Fq " $str "; then
+        tmpfile=$(mktempf0)
+        if [ $? -eq 0 ]; then
+          tmpfiles="$tmpfiles $tmpfile"
+          trap "rm -f $tmpfiles; exit" EXIT HUP INT QUIT PIPE ALRM TERM
+          ln -fs "$arg" "$tmpfile"
+        else
+          printf '%s: Cannot create a temporary file\n' "${0##*/}" 1>&2
+          exit 1
+        fi
+        file=$tmpfile
+      elif [ -f "$arg" ]; then
+        hexed_filelist="$hexed_filelist$str "
+        file=$arg
+      else
+        hexed_filelist_readonce="$hexed_filelist_readonce$str "
+        file=$arg
+      fi
     else
-      hexed_filelist_readonce="$hexed_filelist_readonce$str "
-      file=$arg
+      print_usage_and_exit
     fi
-  else
-    print_usage_and_exit
-  fi
-  if [ ! -r "$file" ]; then
-    printf '%s: Cannot open the file "%s"\n' "${0##*/}" "$arg" 1>&2
-    exit 1
-  fi
-  case "$file" in ''|-|/*|./*|../*) :;; *) file="./$file";; esac
-  filenames="$filenames$LF$file"
-done
+    if [ ! -r "$file" ]; then
+      printf '%s: Cannot open the file "%s"\n' "${0##*/}" "$arg" 1>&2
+      exit 1
+    fi
+    case "$file" in ''|-|/*|./*|../*) :;; *) file="./$file";; esac
+    filenames="$filenames$LF$file"
+  done
+  ;;
+esac
 filenames=${filenames#?}
 case "$filenames" in
   '') use_stdin=1

@@ -7,7 +7,7 @@
 print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 	Usage   : ${0##*/} [-d<c>] [-i<string>] [--template <html>] <param_file>
-	Version : Wed Jun 17 21:32:19 JST 2015
+	Version : Thu Jun 25 04:31:51 JST 2015
 	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands/UTF-8)
 __USAGE
   exit 1
@@ -29,59 +29,62 @@ use_stdin=0
 LF=$(printf '\134\n_'); LF=${LF%_}
 
 # parse arguments
-optmode=''
-i=0
-for arg in "$@"; do
-  i=$((i+1))
-  if [ -z "$optmode" ]; then
-    case "$arg" in
-      -d*)
-        dopt_is_set=1
-        optmode='d'
-        if [ -n "${arg#-d}" ]; then
-          arg=${arg#-d}
-        else
-          optmode=''
+case $# in [^0]*)
+  optmode=''
+  i=0
+  for arg in "$@"; do
+    i=$((i+1))
+    if [ -z "$optmode" ]; then
+      case "$arg" in
+        -d*)
+          dopt_is_set=1
+          optmode='d'
+          if [ -n "${arg#-d}" ]; then
+            arg=${arg#-d}
+          else
+            optmode=''
+            continue
+          fi
+          ;;
+        -i*)
+          optmode='i'
+          if [ -n "${arg#-i}" ]; then
+            arg=${arg#-i}
+          else
+            continue
+          fi
+          ;;
+        --template)
+          optmode='tmpl'
           continue
-        fi
+          ;;
+        *)
+          [ $i -eq $# ] || print_usage_and_exit
+          optmode='param'
+          ;;
+      esac
+    fi
+    case "$optmode" in
+      d)
+        dopt=$arg
+        optmode=''
         ;;
-      -i*)
-        optmode='i'
-        if [ -n "${arg#-i}" ]; then
-          arg=${arg#-i}
-        else
-          continue
-        fi
+      i)
+        iopt=$arg
+        optmode=''
         ;;
-      --template)
-        optmode='tmpl'
-        continue
+      tmpl)
+        tmpl_file=$arg
+        optmode=''
         ;;
-      *)
-        [ $i -eq $# ] || print_usage_and_exit
-        optmode='param'
+      param)
+        param_file=$arg
+        optmode=''
         ;;
     esac
-  fi
-  case "$optmode" in
-    d)
-      dopt=$arg
-      optmode=''
-      ;;
-    i)
-      iopt=$arg
-      optmode=''
-      ;;
-    tmpl)
-      tmpl_file=$arg
-      optmode=''
-      ;;
-    param)
-      param_file=$arg
-      optmode=''
-      ;;
-  esac
-done
+  done
+  ;;
+esac
 if [ -z "$param_file" ]; then
   param_file='-'
 fi
