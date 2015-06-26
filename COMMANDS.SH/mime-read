@@ -7,7 +7,7 @@
 print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 	Usage   : ${0##*/} [-v] <name> <MIME-file>
-	Version : Fri Jun 26 10:17:55 JST 2015
+	Version : Fri Jun 26 10:41:04 JST 2015
 	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
 	        :   * Although GNU AWK produces better performance than the
 	        :     other AWKs
@@ -18,7 +18,7 @@ __USAGE
 PATH='/usr/bin:/bin' which which >/dev/null 2>&1 || {
   which () {
     (
-      ans=$(LANG=C LC_ALL=C type "$1") || return $?
+      ans=$(LANG=C LC_ALL=C type "$1" 2>/dev/null) || return $?
       case "$1"   in */*) printf '%s\n' "$1"        ; return;; esac
       case "$ans" in */*) printf '%s\n' "/${ans#*/}"; return;; esac
       printf '%s\n' "$1"
