@@ -7,7 +7,7 @@
 print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 	Usage   : ${0##*/} [-<n>] <file1> <file2> ...
-	Version : Mon Jun 22 23:00:20 JST 2015
+	Version : Wed Sep 23 17:33:10 JST 2015
 	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
 __USAGE
   exit 1
@@ -26,7 +26,7 @@ use_stdin=0
 
 # parse arguments
 case $# in
-  [^0]*) printf '%s\n' "$1" | grep -q '^-[0-9]\{1,\}$' && {
+  [!0]*) printf '%s\n' "$1" | grep -q '^-[0-9]\{1,\}$' && {
            numoption=${1#-}
            numoption=$((numoption+0))
            shift
@@ -43,7 +43,7 @@ catting() {
        \( "_$1" = '_/proc/self/fd/0' \)    ]
   then
     case $use_stdin in
-      [^0]*) printf '%s: stdin can be used only once in the arguments\n' \
+      [!0]*) printf '%s: stdin can be used only once in the arguments\n' \
                     "${0##*/}" 1>&2
              exit 1
              ;;

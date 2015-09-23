@@ -7,7 +7,7 @@
 print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 	Usage   : ${0##*/} [+ng[<fd>]] key=<key> <master> <tran>
-	Version : Thu Jun 25 04:53:12 JST 2015
+	Version : Wed Sep 23 17:30:41 JST 2015
 	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands/UTF-8)
 __USAGE
   exit 1
@@ -43,7 +43,7 @@ for arg in "$@"; do
     +ng*)
       ng=${arg#+ng}
       case "$ng" in '') ng=2;; esac
-      case "$ng" in *[^0-9]*) print_usage_and_exit;; esac
+      case "$ng" in *[!0-9]*) print_usage_and_exit;; esac
       ng=$((ng+0))
       ;;
     *)
