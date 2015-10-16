@@ -7,7 +7,7 @@
 print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 	Usage   : ${0##*/} key=<key> <master> <tran>
-	Version : Thu Jun 25 05:11:16 JST 2015
+	Version : Fri Oct 16 22:23:32 JST 2015
 	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands/UTF-8)
 __USAGE
   exit 1
@@ -90,7 +90,7 @@ case "$masterfile" in ''|-|/*|./*|../*) :;; *) masterfile="./$masterfile";; esac
 case "$tranfile"   in ''|-|/*|./*|../*) :;; *)   tranfile="./$tranfile"  ;; esac
 
 # validate the "key" argument and make the fields to compare from it
-dlm=''
+dlm='"\001" '
 for arg in $(printf '%s\n' "$key" | tr '@' ' '); do
   # "/" extraction mode (make arg2 if this mode)
   arg1=${arg%%/*}
