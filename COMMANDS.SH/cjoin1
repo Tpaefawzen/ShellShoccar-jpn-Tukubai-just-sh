@@ -7,7 +7,7 @@
 print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 	Usage   : ${0##*/} [+ng[<fd>]] key=<key> <master> <tran>
-	Version : Wed Sep 23 17:30:41 JST 2015
+	Version : Mon Oct 19 13:01:27 JST 2015
 	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands/UTF-8)
 __USAGE
   exit 1
@@ -99,7 +99,7 @@ for arg in $(printf '%s\n' "$key" | tr '@' ' '); do
   if [ \( "_${arg1}/${arg2}" = "_$arg"   \) -a \
        \( -n "$arg1" \) -a \( -n "$arg2" \)    ]
   then
-    break
+    :
   else
     arg2=''
   fi
