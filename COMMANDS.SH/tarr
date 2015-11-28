@@ -7,7 +7,7 @@
 print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 		Usage   : ${0##*/} [-<n>] [-d[<string>]] [num=<n>] <file>
-		Version : Wed Sep 23 17:32:46 JST 2015
+		Version : Sun Nov 29 01:31:00 JST 2015
 		        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
 __USAGE
   exit 1
@@ -18,6 +18,8 @@ set -u
 umask 0022
 PATH='/usr/bin:/bin'
 IFS=$(printf ' \t\n_'); IFS=${IFS%_}
+[ \( "_${LANG-}"   = _ \) -a \( "_${LANG-0}"   = _0 \) ] || LANG0=$LANG
+[ \( "_${LC_ALL-}" = _ \) -a \( "_${LC_ALL-0}" = _0 \) ] || LC_ALL0=$LC_ALL
 export IFS LANG=C LC_ALL=C PATH
 
 # parse the arguments
@@ -78,6 +80,8 @@ fi
 case "$file" in ''|-|/*|./*|../*) :;; *) file="./$file";; esac
 
 # main
+[ \( "_${LANG0-}"   = _ \) -a \( "_${LANG0-0}"   = _0 \) ] || LANG=$LANG0
+[ \( "_${LC_ALL0-}" = _ \) -a \( "_${LC_ALL0-0}" = _0 \) ] || LC_ALL=$LC_ALL0
 export v1=$n
 export v2=$numopt
 export v3="$dopt"
@@ -92,9 +96,8 @@ BEGIN {
   # ===== make the index string ====================================
   #
   idx = "";
-  for (i=1; i<=num; i++) {
-    idx = idx $i OFS;
-  }
+  for (i=1; i<num; i++) {idx = idx $i OFS;}
+  if  (i==num         ) {idx = idx $i    ;}
 
   # ===== TARRing ==================================================
   #
@@ -102,11 +105,14 @@ BEGIN {
     # --- case #1 (without -d option) ------------------------------
     # 1) extract
     for (i=1+num; i<=NF; i+=n) {
-      print idx;
-      dlm = "";
-      for (j=i; j<i+n; j++) {
-        print dlm $j;
-        dlm = OFS;
+      for (j=i; (j<i+n)&&(j<=NF);    ) {
+        if (length(idx)) {print idx,$j;}
+        else             {print     $j;}
+        j++;
+        break;
+      }
+      for (   ; (j<i+n)&&(j<=NF); j++) {
+                          print OFS $j;
       }
       print "\n";
     }
@@ -115,19 +121,23 @@ BEGIN {
     # 1) split data fields
     data = $0;
     for (i=1; i<=num; i++) {
-      data = substr(data,length($i)+1);
-      sub(/^[\t ]+/, "", data);
+      sub(/^[ \t]*[^ \t]+[ \t]+/, "", data);
     }
     split(data, fld, d);
     # 2) extract
-    for (i=1; i<=NF; i+=n) {
-      print idx;
-      dlm = "";
-      for (j=i; j<i+n; j++) {
-        print dlm fld[j];
-        dlm = OFS;
+    i=1;
+    while (i in fld) {
+      for (j=i; (j<i+n)&&(j in fld);    ) {
+        if (length(idx)) {print idx,fld[j];}
+        else             {print     fld[j];}
+        j++;
+        break;
+      }
+      for (   ; (j<i+n)&&(j in fld); j++) {
+                          print OFS fld[j];
       }
       print "\n";
+      i+=n;
     }
   }
 }' "$file"
