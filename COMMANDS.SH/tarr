@@ -7,17 +7,36 @@
 print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 		Usage   : ${0##*/} [-<n>] [-d[<string>]] [num=<n>] <file>
-		Version : Sun Nov 29 11:24:59 JST 2015
-		        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
+		Version : Sun Nov 29 19:46:52 JST 2015
+		        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands/UTF-8)
+		        :   * multibyte strings will be splitted correctly
+		        :     if GNU AWK is available
 __USAGE
   exit 1
+}
+# the alternative of the which command
+PATH='/usr/bin:/bin' which which >/dev/null 2>&1 || {
+  which () {
+    (
+      ans=$(LANG=C LC_ALL=C type "$1" 2>/dev/null) || return $?
+      case "$1"   in */*) printf '%s\n' "$1"        ; return;; esac
+      case "$ans" in */*) printf '%s\n' "/${ans#*/}"; return;; esac
+      printf '%s\n' "$1"
+    )
+  }
 }
 
 # Initialize
 set -u
 umask 0022
-PATH='/usr/bin:/bin'
 IFS=$(printf ' \t\n_'); IFS=${IFS%_}
+while :; do # Does this host have a GNU AWK command?
+  PATH='/usr/bin:/bin:/usr/local/bin'
+  CMD_AWK=$(which gawk 2>/dev/null)
+  [ $? -eq 0 ] && break
+  CMD_AWK=awk  ;  break
+done
+PATH='/usr/bin:/bin'
 [ \( "_${LANG-}"   = _ \) -a \( "_${LANG-0}"   = _0 \) ] || LANG0=$LANG
 [ \( "_${LC_ALL-}" = _ \) -a \( "_${LC_ALL-0}" = _0 \) ] || LC_ALL0=$LC_ALL
 export IFS LANG=C LC_ALL=C PATH
@@ -93,7 +112,7 @@ fi
 export n
 export numopt
 export dopt
-exec awk '
+exec "$CMD_AWK" '
 BEGIN {
   n   = ENVIRON["n"];
   num = ENVIRON["numopt"];
