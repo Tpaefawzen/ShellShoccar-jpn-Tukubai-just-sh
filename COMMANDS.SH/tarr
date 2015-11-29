@@ -7,7 +7,7 @@
 print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 		Usage   : ${0##*/} [-<n>] [-d[<string>]] [num=<n>] <file>
-		Version : Sun Nov 29 01:31:00 JST 2015
+		Version : Sun Nov 29 11:24:59 JST 2015
 		        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
 __USAGE
   exit 1
@@ -80,16 +80,24 @@ fi
 case "$file" in ''|-|/*|./*|../*) :;; *) file="./$file";; esac
 
 # main
-[ \( "_${LANG0-}"   = _ \) -a \( "_${LANG0-0}"   = _0 \) ] || LANG=$LANG0
-[ \( "_${LC_ALL0-}" = _ \) -a \( "_${LC_ALL0-0}" = _0 \) ] || LC_ALL=$LC_ALL0
-export v1=$n
-export v2=$numopt
-export v3="$dopt"
+if [ \( "_${LANG0-}"   = _ \) -a \( "_${LANG0-0}"   = _0 \) ]; then
+  unset LANG
+else
+  LANG=$LANG0
+fi
+if [ \( "_${LC_ALL0-}" = _ \) -a \( "_${LC_ALL0-0}" = _0 \) ]; then
+  unset LC_ALL
+else
+  LC_ALL=$LC_ALL0
+fi
+export n
+export numopt
+export dopt
 exec awk '
 BEGIN {
-  n   = ENVIRON["v1"];
-  num = ENVIRON["v2"];
-  d   = ENVIRON["v3"];
+  n   = ENVIRON["n"];
+  num = ENVIRON["numopt"];
+  d   = ENVIRON["dopt"];
   ORS = "";
 }
 {
