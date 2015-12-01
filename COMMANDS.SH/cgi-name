@@ -7,7 +7,7 @@
 print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 	Usage   : ${0##*/} [-d<c>] [-i<string>] [--template <html>] <param_file>
-	Version : Wed Sep 23 17:29:40 JST 2015
+	Version : Tue Dec  1 16:03:21 JST 2015
 	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands/UTF-8)
 __USAGE
   exit 1
@@ -158,7 +158,7 @@ sed '/^%/y/abcdef/ABCDEF/'                             |
 tr -d '\n'                                             |
 sed 's/%0D%0A/\\n/g'                                   |
 sed 's/&/'"$LF"'/g'                                    |
-sed 's/+/ /'                                           |
+sed 's/+/ /g'                                          |
 grep '^[^=]\{1,\}='                                    |
 exec awk '
 BEGIN {
