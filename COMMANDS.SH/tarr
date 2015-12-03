@@ -7,10 +7,10 @@
 print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 		Usage   : ${0##*/} [-<n>] [-d[<string>]] [num=<n>] <file>
-		Version : Sun Nov 29 19:46:52 JST 2015
+		Version : Fri Dec  4 02:16:02 JST 2015
 		        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands/UTF-8)
-		        :   * multibyte strings will be splitted correctly
-		        :     if GNU AWK is available
+		        : * multibyte strings will be splitted more quickly
+		        :   if GNU AWK is available
 __USAGE
   exit 1
 }
@@ -109,6 +109,12 @@ if [ \( "_${LC_ALL0-}" = _ \) -a \( "_${LC_ALL0-0}" = _0 \) ]; then
 else
   LC_ALL=$LC_ALL0
 fi
+split_str_by_awkfunc=''; split_str_by_myself='#'
+[ -z "$dopt" ]                                             &&
+set | grep -E '^(LANG|LC_[A-Z0-9]+)=' | grep -Eiq 'UTF-?8' &&
+"$CMD_AWK" 'BEGIN{exit (length("\357\274\221")>1)?0:1;}'   && {
+  split_str_by_awkfunc='#';  split_str_by_myself=''
+}
 export n
 export numopt
 export dopt
@@ -150,7 +156,8 @@ BEGIN {
     for (i=1; i<=num; i++) {
       sub(/^[ \t]*[^ \t]+[ \t]+/, "", data);
     }
-    split(data, fld, d);
+    '"$split_str_by_awkfunc"'split(data, fld, d);
+    '"$split_str_by_myself"'split_into_mbletters(data);
     # 2) extract
     i=1;
     while (i in fld) {
@@ -167,4 +174,24 @@ BEGIN {
       i+=n;
     }
   }
-}' "$file"
+}
+function split_into_mbletters(str, pos,len,n) {
+  split("",fld);
+  len = 0;
+  n   = 0;
+  for (pos = 1; pos<= length(str); pos+=len) {
+    n++;
+    s=substr(str, pos, 1);
+    if      (s < "\200") {len=1;}
+    else if (s < "\300") {len=1;}
+    else if (s < "\340") {len=2;}
+    else if (s < "\360") {len=3;}
+    else if (s < "\370") {len=4;}
+    else if (s < "\374") {len=5;}
+    else if (s < "\376") {len=6;}
+    else                 {len=1;}
+    fld[n]=substr(str, pos, len);
+  }
+  return n;
+}
+' "$file"
