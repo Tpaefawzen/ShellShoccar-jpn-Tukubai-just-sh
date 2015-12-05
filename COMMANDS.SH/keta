@@ -9,7 +9,7 @@ print_usage_and_exit () {
 	Usage   : ${0##*/} n1 n2 .. <filename>
 	        : ${0##*/} -v <filename>
 	        : ${0##*/} [--] <filename>
-	Version : Mon Jun 22 01:19:38 JST 2015
+	Version : Fri Dec  4 19:03:11 JST 2015
 	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands/UTF-8)
 __USAGE
   exit 1
@@ -166,18 +166,23 @@ fi
 if [ \( "_$file" = '_-'               \) -o \
      \( "_$file" = '_/dev/stdin'      \) -o \
      \( "_$file" = '_/dev/fd/0'       \) -o \
-     \( "_$file" = '_/proc/self/fd/0' \) -o \
-     \( -c "$file"                    \) -o \
-     \( -p "$file"                    \)    ]
+     \( "_$file" = '_/proc/self/fd/0' \) -o ]
 then
   readonce=1
+elif [ \( -c "$file"                  \) -o \
+       \( -p "$file"                  \)    ]
+then
+  readonce=2
 fi
 if [ \( $readonce -ne 0 \) -a \( \( $mode -eq 0 \) -o \( $mode -eq 2 \) \) ]
 then
   tmpfile=$(mktempf0)
   if [ $? -eq 0 ]; then
     trap "rm -f $tmpfile; exit" EXIT HUP INT QUIT PIPE ALRM TERM
-    cat > "$tmpfile"
+    case $readonce in
+      1) cat         > "$tmpfile";;
+      2) cat "$file" > "$tmpfile";;
+    esac
     file=$tmpfile
   else
     printf '%s: Cannot create a temporary file\n' "${0##*/}" 1>&2
@@ -195,7 +200,8 @@ function utf8strlen(str, len,i,l1,l2,l3) {
   for (i = 1; i <= length(str); i++) {
     len++;
     l1=substr(str, i, 1);
-    if        (l1 < "\200") {       continue;
+    if        (l1 =="\010") {len-=2;continue;
+    } else if (l1 < "\200") {       continue;
     } else if (l1 < "\300") {len--; continue;
     } else if (l1 < "\340") {i++;
     } else if (l1 < "\360") {

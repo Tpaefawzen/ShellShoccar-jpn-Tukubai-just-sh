@@ -7,7 +7,7 @@
 print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 	Usage   : ${0##*/} [-<n>] <file1> <file2> ...
-	Version : Wed Sep 23 17:34:19 JST 2015
+	Version : Fri Dec  4 16:57:39 JST 2015
 	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands/UTF-8)
 __USAGE
   exit 1
@@ -112,15 +112,19 @@ tmpfiles=''
 hexed_filelist=' '
 hexed_filelist_readonce=''
 LF=$(printf '\n_'); LF=${LF%_}
+pwd=$(pwd); pwd="${pwd%/}/"
 
 
 # parse arguments
-mktemp_instead_of_stdin () {
+mktemp_instead_of_specialfile () {
   tmpfile=$(mktempf0)
   if [ $? -eq 0 ]; then
     tmpfiles="$tmpfiles $tmpfile"
     trap "rm -f $tmpfiles; exit" EXIT HUP INT QUIT PIPE ALRM TERM
-    cat > "$tmpfile"
+    case "${1:-}" in
+      '') cat          > "$tmpfile";;
+       *) cat "${1:-}" > "$tmpfile";;
+    esac
   else
     printf '%s: Cannot create a temporary file\n' "${0##*/}" 1>&2
     exit 1
@@ -144,9 +148,12 @@ case $# in [!0]*)
     then
       case $use_stdin in [!0]*) print_usage_and_exit;; esac
       use_stdin=1
-      mktemp_instead_of_stdin
+      mktemp_instead_of_specialfile
       file=$tmpfile
-    elif [ \( -f "$arg" \) -o \( -c "$arg" \) -o \( -p "$arg" \) ]; then
+    elif [ -p "$arg"                          ]; then
+      mktemp_instead_of_specialfile "$arg"
+      file=$tmpfile
+    elif [ \( -f "$arg" \) -o \( -c "$arg" \) ]; then
       str=$(printf '%s' "$arg" |
             od -v -A n -t x1   |
             tr -d ' \n'        )
@@ -158,7 +165,10 @@ case $# in [!0]*)
         if [ $? -eq 0 ]; then
           tmpfiles="$tmpfiles $tmpfile"
           trap "rm -f $tmpfiles; exit" EXIT HUP INT QUIT PIPE ALRM TERM
-          ln -fs "$arg" "$tmpfile"
+          case "$arg" in 
+            /*) ln -fs "$arg"     "$tmpfile";;
+             *) ln -fs "$pwd$arg" "$tmpfile";;
+          esac
         else
           printf '%s: Cannot create a temporary file\n' "${0##*/}" 1>&2
           exit 1
@@ -186,7 +196,7 @@ esac
 filenames=${filenames#?}
 case "$filenames" in
   '') use_stdin=1
-      mktemp_instead_of_stdin
+      mktemp_instead_of_specialfile
       filenames=$tmpfile
       ;;
 esac
@@ -200,7 +210,8 @@ function utf8strlen(str, len,i,l1,l2,l3) {
   for (i = 1; i <= length(str); i++) {
     len++;
     l1=substr(str, i, 1);
-    if        (l1 < "\200") {       continue;
+    if        (l1 =="\010") {len-=2;continue;
+    } else if (l1 < "\200") {       continue;
     } else if (l1 < "\300") {len--; continue;
     } else if (l1 < "\340") {i++;
     } else if (l1 < "\360") {
