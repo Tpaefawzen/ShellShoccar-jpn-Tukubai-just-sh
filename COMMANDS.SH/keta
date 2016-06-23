@@ -166,7 +166,7 @@ fi
 if [ \( "_$file" = '_-'               \) -o \
      \( "_$file" = '_/dev/stdin'      \) -o \
      \( "_$file" = '_/dev/fd/0'       \) -o \
-     \( "_$file" = '_/proc/self/fd/0' \) -o ]
+     \( "_$file" = '_/proc/self/fd/0' \)    ]
 then
   readonce=1
 elif [ \( -c "$file"                  \) -o \
