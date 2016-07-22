@@ -7,7 +7,7 @@
 print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 		Usage   : ${0##*/} [+<n>h] [num=<n>] <file>
-		Version : Wed Sep 23 17:34:57 JST 2015
+		Version : Fri Jul 22 17:40:11 DST 2016
 		        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
 __USAGE
   exit 1
@@ -48,11 +48,12 @@ case $# in [!0]*)
           continue
         fi
         ;;
-      +h*)
+      +*h)
         printf '%s\n' "$1" | grep -q '^+[0-9]*h$' || print_usage_and_exit
         hopt=${1#+}; hopt=${hopt%h}
         case "$hopt" in '') hopt=1;; esac
         hopt=$(expr $hopt + 0)
+        continue
         ;;
       -h|--help|--version)
         print_usage_and_exit
