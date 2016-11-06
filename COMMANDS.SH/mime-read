@@ -7,7 +7,7 @@
 print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 	Usage   : ${0##*/} [-v] <name> <MIME-file>
-	Version : Fri Jun 26 10:41:04 JST 2015
+	Version : Sun Nov  6 10:40:01 JST 2016
 	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
 	        :   * Although GNU AWK produces better performance than the
 	        :     other AWKs
@@ -16,13 +16,10 @@ __USAGE
 }
 # the alternative of the which command
 PATH='/usr/bin:/bin' which which >/dev/null 2>&1 || {
-  which () {
-    (
-      ans=$(LANG=C LC_ALL=C type "$1" 2>/dev/null) || return $?
-      case "$1"   in */*) printf '%s\n' "$1"        ; return;; esac
-      case "$ans" in */*) printf '%s\n' "/${ans#*/}"; return;; esac
-      printf '%s\n' "$1"
-    )
+  which() {
+    command -v "$1" 2>/dev/null |
+    awk 'match($0,/^\//){print; ok=1;}
+         END {if(ok==0){print "which: not found" > "/dev/stderr"; exit 1}}'
   }
 }
 # the alternative of the "mktemp -t"
