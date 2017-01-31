@@ -1,23 +1,22 @@
 #! /bin/sh
 
 # designed by Nobuaki Tounaka
-# written by 321516
+# written by richmikan
 
 # print the usage and exit
 print_usage_and_exit () {
-  cat <<-__USAGE 1>&2
+  cat <<-USAGE 1>&2
 	Usage   : ${0##*/} [-e<c>] [-s<c>] [-n<string>] [--template <html>] <param_file>
-	Version : Sun Nov  6 15:42:52 JST 2016
+	Version : 2017-01-31 13:57:29 JST
 	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
-__USAGE
+	USAGE
   exit 1
 }
 
 # initialize
 set -u
-PATH='/usr/bin:/bin'
-IFS=$(printf ' \t\n_'); IFS=${IFS%_}
-export IFS LANG=C LC_ALL=C PATH
+export LC_ALL=C
+export PATH="$(command -p getconf PATH):${PATH:-}"
 eopt=''
 eopt_is_set=0
 sopt=''
@@ -67,26 +66,21 @@ case $# in [!0]*)
       ;;
     esac
     case "$optmode" in
-      e)
-        eopt=$arg
-        optmode=''
-        ;;
-      s)
-        sopt=$arg
-        optmode=''
-        ;;
-      n)
-        nopt=$arg
-        optmode=''
-        ;;
-      tmpl)
-        tmpl_file=$arg
-        optmode=''
-        ;;
-      param)
-        param_file=$arg
-        optmode=''
-        ;;
+      e)     eopt=$arg
+             optmode=''
+             ;;
+      s)     sopt=$arg
+             optmode=''
+             ;;
+      n)     nopt=$arg
+             optmode=''
+             ;;
+      tmpl)  tmpl_file=$arg
+             optmode=''
+             ;;
+      param) param_file=$arg
+             optmode=''
+             ;;
     esac
   done
   ;;
@@ -124,36 +118,38 @@ then
   }
   tmplvars=$(cat "$tmpl_file"                                               |
              tr '\r\n' '  '                                                 |
+             grep ^                                                         |
              sed 's/\(<[Ii][Nn][Pp][Uu][Tt] [^>]*>\)/'"$LFs"'\1'"$LFs"'</g' |
-             grep -i '<input '                                              |
+             grep     '<[Ii][Nn][Pp][Uu][Tt] '                              |
              grep -iE ' type=["'"'"']?(radio\>|checkbox\>)'                 |
              grep -iE ' name="[^"]*"| name='"'"'[^'"'"']*'"'"'| name=[^ ] ' |
              sed 's/^.*[Nn][Aa][Mm][Ee]="\([^"]*\)".*$/\1/'                 |
              sed 's/^.*[Nn][Aa][Mm][Ee]='"'"'\([^'"'"']*\)'"'"'.*$/\1/'     |
              sed 's/^.*[Nn][Aa][Mm][Ee]=\([^ ]*\) .*$/\1/'                  |
-             grep -v '[^][A-Za-z0-9_.:-]'                                   |
+             grep -v  '[^][A-Za-z0-9_.:-]'                                  |
              sort                                                           |
              uniq                                                           |
              tr '\n' ' '                                                    |
-             sed 's/ $//'                                                   )
+             sed 's/ $//' 2>/dev/null || :                                  )
 elif [ -n "$tmpl_file" ]; then
   print_usage_and_exit
 fi
 
 # transfer the CGI variables string to the "cgi-name format"
 export   eopt eopt_is_set   sopt sopt_is_set   nopt   tmplvars
-cat "$param_file"                                        |
-sed 's/\(%[0-9A-Fa-f][0-9A-Fa-f]\)/'"$LFs"'\1'"$LFs"'/g' |
-sed '/^%/y/abcdef/ABCDEF/'                               |
-tr -d '\n'                                               |
-case $eopt_is_set in                                     #
-  0) cat                                 ;;              #
-  *) sed 's/%5C/\\/g' | sed 's/\\/\\\\/g';;              #
-esac                                                     |
-sed 's/%0D%0A/\\n/g'                                     |
-sed 's/&/'"$LFs"'/g'                                     |
-sed 's/+/ /g'                                            |
-grep '^[^=]\{1,\}='                                      |
+cat "$param_file"                                                    |
+sed 's/\(%[0-9A-Fa-f][0-9A-Fa-f]\)/'"$LFs"'\1'"$LFs"'/g' 2>/dev/null |
+sed '/^%/y/abcdef/ABCDEF/'                                           |
+tr -d '\n'                                                           |
+grep ^                                                               |
+case $eopt_is_set in                                                 #
+  0) cat                                 ;;                          #
+  *) sed 's/%5C/\\/g' | sed 's/\\/\\\\/g';;                          #
+esac                                                                 |
+sed 's/%0D%0A/\\n/g'                                                 |
+sed 's/&/'"$LFs"'/g'                                                 |
+sed 's/+/ /g'                                                        |
+grep '^[^=]\{1,\}='                                                  |
 exec awk '
 BEGIN {
   for (i = 0; i < 256; i++) {

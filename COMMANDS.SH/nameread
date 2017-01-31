@@ -1,13 +1,13 @@
 #! /bin/sh
 
 # designed by Nobuaki Tounaka
-# written by 321516
+# written by richmikan
 
 # print the usage and exit
 print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 	Usage   : ${0##*/} [-el] [-s<c>] [-n<string>] <name> <name_file>
-	Version : Sun Nov  6 16:14:05 JST 2016
+	Version : 2017-01-31 14:20:40 JST
 	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
 __USAGE
   exit 1
@@ -16,9 +16,8 @@ __USAGE
 # initialize
 set -u
 umask 0022
-PATH='/usr/bin:/bin'
-IFS=$(printf ' \t\n_'); IFS=${IFS%_}
-export IFS LANG=C LC_ALL=C PATH
+export LC_ALL=C
+export PATH="$(command -p getconf PATH):${PATH:-}"
 sopt=''
 sopt_is_set=0
 nopt=''
