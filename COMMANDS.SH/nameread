@@ -1,3 +1,5 @@
+#!/bin/sh
+
 # designed by Nobuaki Tounaka
 # written by Shell-Shoccar Japan (@shellshoccarjpn)
 
@@ -5,7 +7,7 @@
 print_usage_and_exit () {
   cat <<-USAGE 1>&2
 	Usage   : ${0##*/} [-el] [-s<c>] [-n<string>] <name> <name_file>
-	Version : 2017-01-31 14:20:40 JST
+	Version : 2017-02-07 02:01:03 JST
 	          Open usp Tukubai (POSIX Bourne Shell/POSIX commands)
 	USAGE
   exit 1
