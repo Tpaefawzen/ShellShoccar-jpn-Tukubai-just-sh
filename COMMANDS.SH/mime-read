@@ -1,50 +1,140 @@
-#! /bin/sh
+#!/bin/sh
 
-# designed by Nobuaki Tounaka
-# written by 321516
+######################################################################
+#
+# MIME-READ - A MIME Data Decoder Which Is Uploaded Onto Web Server
+#
+# USAGE: mime-read [-v] <name> <MIME-file>
+#
+#        -v .... Just lists the names which are contained in the MIME data
+#
+# Designed originally by Nobuaki Tounaka
+# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-02-07
+#
+# This is a public-domain software (CC0). It measns that all of the
+# people can use this for any purposes with no restrictions at all.
+# By the way, I am fed up the side effects which are broght about by
+# the major licenses.
+#
+######################################################################
 
-# print the usage and exit
+
+######################################################################
+# Initial Configuration
+######################################################################
+
+# === Initialize shell environment ===================================
+set -u
+umask 0022
+export LC_ALL=C
+export PATH="$(command -p getconf PATH)${PATH:+:}${PATH:-}"
+
+# === Define the functions for printing usage and error message ======
 print_usage_and_exit () {
-  cat <<-__USAGE 1>&2
+  cat <<-USAGE 1>&2
 	Usage   : ${0##*/} [-v] <name> <MIME-file>
-	Version : Sun Nov  6 10:40:01 JST 2016
-	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
-	        :   * Although GNU AWK produces better performance than the
-	        :     other AWKs
-__USAGE
+	          -v .... Just lists the names which are contained in the MIME data
+	Version : 2017-02-07 19:00:42 JST
+	          Open usp Tukubai (POSIX Bourne Shell/POSIX commands)
+	            * Although GNU AWK produces better performance than the
+	              other AWKs
+	USAGE
   exit 1
 }
-# the alternative of the which command
-PATH='/usr/bin:/bin' which which >/dev/null 2>&1 || {
+error_exit() {
+  [ -n "$2" ] && echo "${0##*/}: $2" 1>&2
+  exit $1
+}
+
+
+######################################################################
+# Parse Arguments
+######################################################################
+
+# === Print usage and exit when no options is given ==================
+case $# in 0) print_usage_and_exit;; esac
+
+# === Get the options and the filepath ===============================
+# --- initialize option parameters
+vopt='#'       # enable codes when "-v" is set
+novopt=''      # enable codes when "-v" is not set
+name=''
+mime_file=''
+#
+# --- get them
+case $1 in
+  '-v') vopt=''
+        novopt='#'
+        shift
+        case $# in
+          0) mime_file='-'       ;;
+          1) mime_file=$1        ;;
+          *) print_usage_and_exit;;
+        esac
+        ;;
+     *) case $# in
+          1) name=$1; mime_file='-';;
+          2) name=$1; mime_file=$2 ;;
+          *) print_usage_and_exit ;;
+        esac
+        ;;
+esac
+
+# === Validate the arguments =========================================
+if [ ! -f "$mime_file"     ] &&
+   [ ! -c "$mime_file"     ] &&
+   [ ! -p "$mime_file"     ] &&
+   [ "_$mime_file" != '_-' ]  ; then
+  error_exit 1 'Cannot open the file: $mime_file'
+fi
+case "$mime_file" in -|/*|./*|../*) :;; *) file="./$mime_file";; esac
+
+
+######################################################################
+# Prepare for the Main Routine
+######################################################################
+
+# === Define some chrs. to escape some special chrs. temporarily =====
+LFs=$(printf '\\\n_');LFs=${LFs%_} # Use as a "\n" in s-command of sed
+
+# === Define some functions ==========================================
+# --- FUNC : remove the temporary file before exiting ----------------
+tmpfiles=''
+exit_trap() {
+  trap '-' EXIT HUP INT QUIT PIPE ALRM TERM
+  rm -f ${tmpfiles:-}
+  exit ${1:-0}
+}
+# --- FUNC : the alternative of the which command --------------------
+which which >/dev/null 2>&1 || {
   which() {
     command -v "$1" 2>/dev/null |
     awk 'match($0,/^\//){print; ok=1;}
          END {if(ok==0){print "which: not found" > "/dev/stderr"; exit 1}}'
   }
 }
-# the alternative of the "mktemp -t"
+# --- FUNC : the alternative of the "mktemp -t" ----------------------
 mktempf0() {
-  # --- parameters, etc. ---------------------------------------------
+  # --- parameters, etc.
   num_of_digits=16  # Length of Random String
   n=10              # Max Times of Retrying
   chrs='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_'
                     # Available letters
-  LF=$(printf '\\\n_');LF=${LF%_}
-  # --- call built-in mktemp if exists -------------------------------
+  # --- call built-in mktemp if exists
   type mktemp >/dev/null 2>&1 && {
     mktemp -t tmp.${0##*/}.$$.XXXXXXXXXXXXXXXX
     return $?
   }
-  # --- set the temporary directory ----------------------------------
+  # --- set the temporary directory
   Dir_tmp=$(set | grep -q ^TMPDIR= | sed 's/^[^=]\{1,\}=//');
   case "$Dir_tmp" in
     '') Dir_tmp='/tmp'      ;;
     /)  Dir_tmp=''          ;;
     *)  Dir_tmp=${Dir_tmp%/};;
   esac
-  # --- mktemp loop --------------------------------------------------
+  # --- mktemp loop
   while [ $n -ge 0 ]; do
-    # --- Generate Ramdom string -------------------------------------
+    # --- Generate Ramdom string
     # calculate the number of words which required
     nw=$(echo "${num_of_digits}*l(${#chrs})/11.09+1" | # 11.09=ln(65536)
          bc -l                                       |
@@ -58,7 +148,7 @@ mktempf0() {
     else
       hstr=$( (ps -Ao pid,etime,pcpu,vsz; date)         |
              od -t d4 -A n -v                           |
-             sed 's/[^0-9]\{1,\}/'"$LF"'/g'             |
+             sed 's/[^0-9]\{1,\}/'"$LFs"'/g'            |
              grep '[0-9]'                               |
              tail -n 42                                 |
              sed 's/.*\(.\{8\}\)$/\1/g'                 |
@@ -85,146 +175,65 @@ mktempf0() {
                      }                        }                  #
              /[0-9]/{print c[$0*1];           }'                 |
         tail -c $num_of_digits                                   )
-    # --- Making the file path ---------------------------------------
+    # --- Making the file path
     Path_target="${Dir_tmp}/tmp.${0##*/}.$$.$s"
-    # --- Making the file --------------------------------------------
+    # --- Making the file
     (set -C; umask 177; : > "$Path_target") 2>/dev/null || {
       [ -f "$Path_target" ] && { n=$((n-1)); continue; }
       n=-1; break;
     }
     break
   done
-  # --- print error message when failed to make a file ---------------
+  # --- print error message when failed to make a file
   case "$n" in -1) return 1;; esac
-  # --- print the path of the file -----------------------------------
+  # --- print the path of the file
   printf '%s\n' "$Path_target"
-  # --- return successfully ------------------------------------------
+  # --- return successfully
   return 0
 }
-# decide whether to use the alternative length of AWK or not
-if awk 'BEGIN{a[1]=1;b=length(a)}' 2>/dev/null; then
-  arlen='length'
-else
-  arlen='arlen'
-fi
-
-# initialize
-set -u
-umask 0022
-PATH='/usr/bin:/bin:/usr/local/bin'
-IFS=$(printf ' \t\n_'); IFS=${IFS%_}
-export IFS LANG=C LC_ALL=C PATH
-name=''
-mime_file=''
-vopt='#'
-novopt=''
-binarable_awk=1
-nobawk=''
-novoptnobawk='#'
-tmpfiles=''
+# --- FUNC : make_temp_file ------------------------------------------
 make_temp_file () {
   tmpfile=$(mktempf0)
   if [ $? -eq 0 ]; then
     tmpfiles="$tmpfiles $tmpfile"
-    trap "rm -f $tmpfiles; exit" EXIT HUP INT QUIT PIPE ALRM TERM
+    trap 'exit_trap' EXIT HUP INT QUIT PIPE ALRM TERM
   else
     printf '%s: Cannot create a temporary file\n' "${0##*/}" 1>&2
     exit 1
   fi
 }
 
-# parse arguments
-[ $# -ge 1 ] || print_usage_and_exit
-optmode=''
-i=0
-for arg in "$@"; do
-  i=$((i+1))
-  if [ -z "$optmode" ]; then
-    case "$arg" in
-      -[v]*)
-        ret=$(printf '%s\n' "${arg#-}" |
-              awk '{
-                v = "_";
-                opt_str = "";
-                for (n=1;n<=length($0);n++) {
-                  s = substr($0,n,1);
-                  if (s == "v") {
-                    v = "v";
-                    #opt_str = substr($0,n+1);
-                    #break;
-                  }
-                }
-                printf("%s %s",v,opt_str);
-              }')
-        ret1=${ret%% *}
-        ret2=${ret#* }
-        if [ "${ret1#*d}" != "$ret1" ]; then
-          dopt_is_set=1
-          if [ -n "$ret2" ]; then
-            dopt=$ret2
-          else
-            dopt=''
-          fi
-        fi
-        if [ "${ret1#*v}" != "$ret1" ]; then
-          vopt=''
-          novopt='#'
-        fi
-        ;;
-      *)
-        if [ -z "$novopt$name" ]; then
-          [ $i -ge $(($#-1)) ] || print_usage_and_exit
-          name=$arg
-        elif [ -z "$mime_file" ]; then
-          [ $i -eq $# ] || print_usage_and_exit
-          mime_file=$arg
-        else
-          print_usage_and_exit
-        fi
-        ;;
-    esac
-  else
-    print_usage_and_exit
-  fi
-done
-if [ -z "$novopt$name" ]; then
-  print_usage_and_exit
-fi
-if [ -z "$mime_file" ]; then
-  mime_file='-'
-elif [ \( ! -f "$mime_file"     \) -a \
-       \( ! -c "$mime_file"     \) -a \
-       \( ! -p "$mime_file"     \) -a \
-       \( "_$mime_file" != '_-' \)    ]
-then
-  print_usage_and_exit
-fi
-case "$mime_file" in ''|-|/*|./*|../*) :;; *) file="./$mime_file";; esac
-if [ \( ! -r "$mime_file" \) -a \( "_$mime_file" != '_-' \) ]; then
-  printf '%s: Cannot open the file\n' "${0##*/}" 1>&2
-  exit 1
-fi
-
-# Does this host have a "binarable" AWK command?
+# === Define which AWK command and its function are used =============
+# --- Does this host have a "binarable" AWK command? -----------------
+binarable_awk=1
 while :; do
   CMD_AWK=$(which gawk 2>/dev/null)
-  [ $? -eq 0 ] && break
+  case $? in 0) break;; esac
   CMD_AWK=$(which awk 2>/dev/null)
-  [ $($CMD_AWK 'BEGIN{print length("\000")}') -eq 1 ] && break
+  case $($CMD_AWK 'BEGIN{print length("\000")}') in 1) break;; esac
   binarable_awk=0; break
 done
-if [ $binarable_awk -eq 0 ]; then
-  nobawk='#'
-  [ -z "$novopt" ] && novoptnobawk=''
-fi
+nobawk=''        # enable codes when the binarable is not available
+novoptnobawk='#' # enable codes when the binarable is not available and
+                 # "-v" option is not set
+case $binarable_awk in
+  0) nobawk='#'
+     case "$novopt" in '') novoptnobawk='';; esac
+     ;;
+esac
+# --- decide whether to use the alternative length or not ------------
+case "$("$CMD_AWK" 'BEGIN{a[3]=3;a[4]=4;print length(a)}' 2>/dev/null)" in
+  2) arlen='length';;
+  *) arlen='arlen' ;; # use an equivalent original function if not supported
+esac
 
-# awk code
+
+# === Generate the AWK code for mime-read operation ==================
 awk_code='
 # the alternative length function for array variable
 function arlen(ar,i,l){for(i in ar){l++;}return l;}
 
 BEGIN {
-  RS  = "\n";
   OFS = ""  ;
   ORS = ""  ;
   _assert_exit = 0;
@@ -443,38 +452,42 @@ function up_to_the_parent() {
 }
 '
 
-# main #1 (GNU AWK available or -v option)
-if [ -n "$novoptnobawk" ]; then
-  exec env -i v1="$name" $CMD_AWK "$awk_code" "$mime_file"
-  exit $?
-fi
 
-# main #2 (GNU AWK unavailable and without -v option)
+######################################################################
+# Main Routine
+######################################################################
+
+# === main (A) : GNU AWK available or -v option ======================
+case "$novoptnobawk" in '#')
+  exec env -i v1="$name" "$CMD_AWK" "$awk_code" "$mime_file"
+  exit $?
+  ;;
+esac
+
+# === main (B) : GNU AWK unavailable and without -v option ===========
 # (commands should not be run with "exec" because of having to remove tempfiles)
-if [ \( "_$mime_file" = '_-' \) -o \
-     \( -c "$mime_file"      \) -o \
-     \( -p "$mime_file"      \)    ]
-then
+if [ "_$mime_file" = '_-' ] || [ -c "$mime_file" ] || [ -p "$mime_file" ]; then
   make_temp_file
   cat "$mime_file" > "$tmpfile"
   mime_file=$tmpfile
 fi
-st_ed_linenums=$(env -i v1="$name" $CMD_AWK "$awk_code" "$mime_file")
+st_ed_linenums=$(env -i v1="$name" "$CMD_AWK" "$awk_code" "$mime_file")
 ret=$?
-[ $ret -ne 0 ] && exit $ret
+case $ret in 0) :;; *) exit_trap $ret;; esac
 st_linenum=${st_ed_linenums%:*}
 ed_linenum=${st_ed_linenums#*:}
-if [ -n "$ed_linenum" ]; then
-  make_temp_file
-  outfile0=$tmpfile
-  tail -n +$st_linenum "$mime_file"  |
-  head -n $((ed_linenum-st_linenum)) > $outfile0
-  ret=$?
-  [ $ret -ne 0 ] && exit $ret
-  # Cut the tail 2-byte (0x0D,0x0A) of the file
-  dd if=$outfile0 bs=1 count=$(ls -l $outfile0 | awk '{print $5-2}') 2>/dev/null
-  exit $?
-else
-  tail -n +$st_linenum "$mime_file"
-  exit $?
-fi
+case "$ed_linenum" in
+  '') tail -n +$st_linenum "$mime_file"
+      ;;
+   *) make_temp_file
+      outfile0=$tmpfile
+      tail -n +$st_linenum "$mime_file"  |
+      head -n $((ed_linenum-st_linenum)) > $outfile0
+      ret=$?
+      case $ret in 0) :;; *) exit_trap $ret;; esac
+      # Cut the tail 2-byte (0x0D,0x0A) of the file
+      n=$(ls -l $outfile0 | "$CMD_AWK" '{print $5-2}')
+      dd if=$outfile0 bs=1 count=$n 2>/dev/null
+      ;;
+esac
+exit_trap $?
