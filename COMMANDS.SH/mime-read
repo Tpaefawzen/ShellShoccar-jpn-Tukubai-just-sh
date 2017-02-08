@@ -6,10 +6,12 @@
 #
 # USAGE: mime-read [-v] <name> <MIME-file>
 #
+#        <MIME-file>
+#           .... MIME data file
 #        -v .... Just lists the names which are contained in the MIME data
 #
 # Designed originally by Nobuaki Tounaka
-# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-02-07
+# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-02-08
 #
 # This is a public-domain software (CC0). It measns that all of the
 # people can use this for any purposes with no restrictions at all.
@@ -33,8 +35,9 @@ export PATH="$(command -p getconf PATH)${PATH:+:}${PATH:-}"
 print_usage_and_exit () {
   cat <<-USAGE 1>&2
 	Usage   : ${0##*/} [-v] <name> <MIME-file>
-	          -v .... Just lists the names which are contained in the MIME data
-	Version : 2017-02-07 19:00:42 JST
+	Args    : <MIME-file> .. MIME data file
+	Options : -v .... Just lists the names which are contained in the MIME data
+	Version : 2017-02-08 17:55:05 JST
 	          Open usp Tukubai (POSIX Bourne Shell/POSIX commands)
 	            * Although GNU AWK produces better performance than the
 	              other AWKs
@@ -46,6 +49,9 @@ error_exit() {
   exit $1
 }
 
+# === Define some chrs. to escape some special chrs. temporarily =====
+LFs=$(printf '\\\n_');LFs=${LFs%_} # Use as a "\n" in s-command of sed
+
 
 ######################################################################
 # Parse Arguments
@@ -55,13 +61,13 @@ error_exit() {
 case $# in 0) print_usage_and_exit;; esac
 
 # === Get the options and the filepath ===============================
-# --- initialize option parameters
+# --- initialize option parameters -----------------------------------
 vopt='#'       # enable codes when "-v" is set
 novopt=''      # enable codes when "-v" is not set
 name=''
 mime_file=''
 #
-# --- get them
+# --- get them -------------------------------------------------------
 case $1 in
   '-v') vopt=''
         novopt='#'
@@ -93,9 +99,6 @@ case "$mime_file" in -|/*|./*|../*) :;; *) file="./$mime_file";; esac
 ######################################################################
 # Prepare for the Main Routine
 ######################################################################
-
-# === Define some chrs. to escape some special chrs. temporarily =====
-LFs=$(printf '\\\n_');LFs=${LFs%_} # Use as a "\n" in s-command of sed
 
 # === Define some functions ==========================================
 # --- FUNC : remove the temporary file before exiting ----------------
