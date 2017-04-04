@@ -22,7 +22,7 @@
 #                      or "checkbox}" 
 #
 # Designed originally by Nobuaki Tounaka
-# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-03-05
+# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-04-04
 #
 # This is a public-domain software (CC0). It means that all of the
 # people can use this for any purposes with no restrictions at all.
@@ -59,7 +59,7 @@ print_usage_and_exit () {
 	                        in the data from <param_file> even though the same
 	                        variables exist <html> as a <input type="radio">
 	                        or "checkbox}" 
-	Version : 2017-03-05 04:49:02 JST
+	Version : 2017-04-04 14:29:11 JST
 	          Open usp Tukubai (POSIX Bourne Shell/POSIX commands)
 	USAGE
   exit 1
@@ -195,7 +195,8 @@ then
              sort                                                           |
              uniq                                                           |
              tr '\n' ' '                                                    |
-             sed 's/ $//' 2>/dev/null || :                                  )
+             grep ^                                                         |
+             sed 's/ $//'                                                   )
 elif [ -n "$tmpl_file" ]; then
   print_usage_and_exit
 fi
@@ -207,19 +208,19 @@ fi
 
 # === transfer the CGI variables string to the "Unicage name format" =
 export   opte opte_is_set   opts opts_is_set   optn   tmplvars
-cat "$param_file"                                                    |
-sed 's/\(%[0-9A-Fa-f][0-9A-Fa-f]\)/'"$LFs"'\1'"$LFs"'/g' 2>/dev/null |
-sed '/^%/y/abcdef/ABCDEF/'                                           |
-tr -d '\n'                                                           |
-grep ^                                                               |
-case $opte_is_set in                                                 #
-  0) cat                                 ;;                          #
-  *) sed 's/%5C/\\/g' | sed 's/\\/\\\\/g';;                          #
-esac                                                                 |
-sed 's/%0D%0A/\\n/g'                                                 |
-sed 's/&/'"$LFs"'/g'                                                 |
-sed 's/+/ /g'                                                        |
-grep '^[^=]\{1,\}='                                                  |
+grep ^ "$param_file"                                     |
+sed 's/\(%[0-9A-Fa-f][0-9A-Fa-f]\)/'"$LFs"'\1'"$LFs"'/g' |
+sed '/^%/y/abcdef/ABCDEF/'                               |
+tr -d '\n'                                               |
+grep ^                                                   |
+case $opte_is_set in                                     #
+  0) cat                                 ;;              #
+  *) sed 's/%5C/\\/g' | sed 's/\\/\\\\/g';;              #
+esac                                                     |
+sed 's/%0D%0A/\\n/g'                                     |
+sed 's/&/'"$LFs"'/g'                                     |
+sed 's/+/ /g'                                            |
+grep '^[^=]\{1,\}='                                      |
 exec awk '
 BEGIN {
   for (i = 0; i < 256; i++) {
