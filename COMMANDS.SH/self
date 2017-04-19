@@ -16,7 +16,7 @@
 #                  as a field formatted string instead of <file>
 #
 # Designed originally by Nobuaki Tounaka
-# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-03-05
+# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-04-17
 #
 # This is a public-domain software (CC0). It means that all of the
 # people can use this for any purposes with no restrictions at all.
@@ -48,7 +48,7 @@ print_usage_and_exit () {
 	Options : -d ...... Direct Mode :
 	          It make this command regard the last argument (<string>)
 	          as a field formatted string instead of <file>
-	Version : 2017-03-05 04:49:02 JST
+	Version : 2017-04-17 16:36:53 JST
 	          Open usp Tukubai (POSIX Bourne Shell/POSIX commands/UTF-8)
 	USAGE
   exit 1
@@ -65,7 +65,6 @@ error_exit() {
 
 # === Get the options and the filepath ===============================
 # --- initialize option parameters -----------------------------------
-# initialize
 directmode=0
 directstr=''
 awkprstr=''    # partial code for AWK, which contains field variables for print
@@ -292,7 +291,7 @@ BEGIN {
 END {
   if (_assert_exit) {
     print "'"${0##*/}"': Invalid string position for separating the field",
-          "at line", NR > "/dev/stderr";
+          "at line", NR | "cat 1>&2";
     exit _assert_exit;
   }
 }

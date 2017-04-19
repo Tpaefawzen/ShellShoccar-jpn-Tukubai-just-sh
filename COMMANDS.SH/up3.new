@@ -7,7 +7,7 @@
 print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 	Usage   : ${0##*/} key=<key> <master> <tran>
-	Version : Sun Nov  6 10:42:23 JST 2016
+	Version : 2017-04-17 16:31:29 JST
 	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
 	        :   * The field delimiters which consist of two or more spaces
 	        :     MUST BE TRUNCATED to one before using this command.
@@ -21,9 +21,9 @@ __USAGE
 # the alternative of the which command
 PATH='/usr/bin:/bin' which which >/dev/null 2>&1 || {
   which() {
-    command -v "$1" 2>/dev/null |
-    awk 'match($0,/^\//){print; ok=1;}
-         END {if(ok==0){print "which: not found" > "/dev/stderr"; exit 1}}'
+    command -v "$1" 2>/dev/null | grep '^/' || {
+      echo 'which: not found' 1>&2 && (exit 1)
+    }
   }
 }
 # Does this host have a sort command which supports "-s" option?

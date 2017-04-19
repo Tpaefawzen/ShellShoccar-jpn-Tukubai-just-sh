@@ -27,9 +27,9 @@ export IFS LANG=C LC_ALL=C PATH
 ■whichを使っている場合は先頭にコレを置く
 PATH='/usr/bin:/bin' which which >/dev/null 2>&1 || {
   which() {
-    command -v "$1" 2>/dev/null |
-    awk 'match($0,/^\//){print; ok=1;}
-         END {if(ok==0){print "which: not found" > "/dev/stderr"; exit 1}}'
+    command -v "$1" 2>/dev/null | grep '^/' || {
+      echo 'which: not found' 1>&2 && (exit 1)
+    }
   }
 }
 

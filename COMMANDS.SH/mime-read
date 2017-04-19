@@ -11,7 +11,7 @@
 #        -v .... Just lists the names which are contained in the MIME data
 #
 # Designed originally by Nobuaki Tounaka
-# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-03-05
+# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-04-17
 #
 # This is a public-domain software (CC0). It means that all of the
 # people can use this for any purposes with no restrictions at all.
@@ -37,7 +37,7 @@ print_usage_and_exit () {
 	Usage   : ${0##*/} [-v] <name> <MIME-file>
 	Args    : <MIME-file> .. MIME data file
 	Options : -v .... Just lists the names which are contained in the MIME data
-	Version : 2017-03-05 04:49:02 JST
+	Version : 2017-04-17 16:32:57 JST
 	          Open usp Tukubai (POSIX Bourne Shell/POSIX commands)
 	            * Although GNU AWK produces better performance than the
 	              other AWKs
@@ -111,9 +111,9 @@ exit_trap() {
 # --- FUNC : the alternative of the which command --------------------
 which which >/dev/null 2>&1 || {
   which() {
-    command -v "$1" 2>/dev/null |
-    awk 'match($0,/^\//){print; ok=1;}
-         END {if(ok==0){print "which: not found" > "/dev/stderr"; exit 1}}'
+    command -v "$1" 2>/dev/null | grep '^/' || {
+      echo 'which: not found' 1>&2 && (exit 1)
+    }
   }
 }
 # --- FUNC : the alternative of the "mktemp -t" ----------------------
@@ -425,7 +425,7 @@ BEGIN {
 }
 END {
   if (_assert_exit) {
-    print "'"${0##*/}"': This is not a MIME data", "\n" > "/dev/stderr";
+    print "'"${0##*/}"': This is not a MIME data", "\n" | "cat 1>&2";
     exit _assert_exit;
   }
 }

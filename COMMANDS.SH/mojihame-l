@@ -1,37 +1,108 @@
-#! /bin/sh
+#!/bin/sh
 
-# designed by Nobuaki Tounaka
-# written by 321516
+######################################################################
+#
+# MOJIHAME-L - Insert Words In Input Data Into The Template File
+#              (Line Mode)
+#
+# USAGE: mojihame [-l<label>] [-d[<string>]] <template> <data>
+#
+#        <template> . Template file should be inserted into
+#        <data> ..... Source data file should be inserted
+#        -d<string> . Set the symbol string which is regarded as an empty
+#                     string. (default: "@")
+#                     If "-dNULL" is set and one of the 2nd field string
+#                     is "NULL", the macro "%2" will be replaced "" instead
+#                     of "NULL".
+#        -l<label> .. Set the border string of the mojihame paragraph
+#                     (see below)
+#
+#        * mojihame mode:
+#          This command has the following mode.
+#          "line mode" ...... Replace the macro string "%n"s only in the
+#                             paragraph which are between the lines <label>
+#                             contain. And duplicate the paragraph by the
+#                             number of source data lines.
+#
+#        * strings for escaping:
+#          The following strings which are in fileds of source data are
+#          used for escaping.
+#            "_" ........ This letter is used to express the space " ".
+#                         For instance, "I_am" will be unescaped to "I am"
+#                         when replacing "%n" into it.
+#            "\_" ....... This string is used to express the underscore "_".
+#                         For instance, "\_ABC" will be unescaped to "_ABC"
+#                         when replacing "%n" into it.
+#            "\\" ....... This string is used to express the backslash.
+#                         For instance, "\\n" will be unescaped to "\n"
+#                         when replacing "%n" into it.
+#            "@" or <string> which follows "-d" option when the option used
+#                         This string is used to express the empty string "".
+#                         See -d option for detail.
+#
+# Designed originally by Nobuaki Tounaka
+# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-04-18
+#
+# This is a public-domain software (CC0). It means that all of the
+# people can use this for any purposes with no restrictions at all.
+# By the way, We are fed up with the side effects which are brought
+# about by the major licenses.
+#
+######################################################################
 
-# print the usage and exit
-print_usage_and_exit () {
-  cat <<-__USAGE 1>&2
-		Usage   : ${0##*/} [-l<label>] [-d[<string>]] <template> <data>
-		Version : Thu Jun 25 05:05:27 JST 2015
-		        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
-__USAGE
-  exit 1
-}
-# decide whether to use the alternative length of AWK or not
-if awk 'BEGIN{a[1]=1;b=length(a)}' 2>/dev/null; then
-  arlen='length'
-else
-  arlen='arlen'
-fi
 
-# Initialize
+######################################################################
+# Initial Configuration
+######################################################################
+
+# === Initialize shell environment ===================================
 set -u
 umask 0022
-PATH='/usr/bin:/bin'
-IFS=$(printf ' \t\n_'); IFS=${IFS%_}
-export IFS LANG=C LC_ALL=C PATH
+export LC_ALL=C
+export PATH="$(command -p getconf PATH)${PATH:+:}${PATH:-}"
 
-# parse the arguments
-case $# in [01]) print_usage_and_exit;; esac
+# === Define the functions for printing usage and error message ======
+print_usage_and_exit () {
+  cat <<-USAGE 1>&2
+	Usage   : ${0##*/} [-l<label>] [-d[<string>]] <template> <data>
+	Args    : <template> . Template file should be inserted into
+	          <data> ..... Source data file should be inserted
+	Options : -d<string> . Set the symbol string which is regarded as an empty
+	                       string. (default: "@")
+	                       If "-dNULL" is set and one of the 2nd field string
+	                       is "NULL", the macro "%2" will be replaced "" instead
+	                       of "NULL".
+	          -l<label> .. Set the border string of the mojihame paragraph
+	Version : 2017-04-18 16:34:07 JST
+	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
+	USAGE
+  exit 1
+}
+error_exit() {
+  ${2+:} false && echo "${0##*/}: $2" 1>&2
+  exit $1
+}
+
+# === Check whether the AWK on this host support length() or not =====
+case "$(awk 'BEGIN{a[3]=3;a[4]=4;print length(a)}' 2>/dev/null)" in
+  2) arlen='length';;
+  *) arlen='arlen' ;; # use an equivalent original function if not supported
+esac
+
+
+######################################################################
+# Parse Arguments
+######################################################################
+
+# === Get the options and the filepath ===============================
+# --- initialize option parameters -----------------------------------
 label=''
 asnull='@'
-file_tmpl=''
-file_data=''
+file_tmpl=''; tmplfromF=''; tmplfrom0='#'
+file_data=''; datafromF=''; datafrom0='#'
+#
+# --- get them -------------------------------------------------------
+case $# in [01]) print_usage_and_exit;; esac
 optmode=''
 i=0
 for arg in "$@"; do
@@ -64,35 +135,46 @@ for arg in "$@"; do
   fi
 done
 
-# validate the arguments
+# === Validate the arguments =========================================
 [ -n "$file_tmpl" ] || print_usage_and_exit
 [ -n "$file_data" ] || file_data='-'
 use_stdin=0
+i=0
 for file in "$file_tmpl" "$file_data"; do
-  if [ \( "_$file" = '_-'               \) -o \
-       \( "_$file" = '_/dev/stdin'      \) -o \
-       \( "_$file" = '_/dev/fd/0'       \) -o \
-       \( "_$file" = '_/proc/self/fd/0' \)    ]
+  if [ "_$file" = '_-'               ] ||
+     [ "_$file" = '_/dev/stdin'      ] ||
+     [ "_$file" = '_/dev/fd/0'       ] ||
+     [ "_$file" = '_/proc/self/fd/0' ]  ;
   then
     use_stdin=$((use_stdin+1))
+    case $i in
+      0) tmplfromF='#'; tmplfrom0='';;
+      *) datafromF='#'; datafrom0='';;
+    esac
   fi
+  i=$((i+0))
 done
-[ $use_stdin -le 1 ] || print_usage_and_exit
-if [ \( ! -r "$file_tmpl" \) -a \( "_$file_tmpl" != '_-' \) ]; then
-  printf '%s: Cannot open the template file\n' "${0##*/}" 1>&2
-  exit 1
+[ $use_stdin -le 1 ] || {
+  error_exit 1 'STDIN cannot be used for <template> and <data> at the same time'
+}
+if [ ! -r "$file_tmpl" ] && [ "_$file_tmpl" != '_-' ]; then
+  error_exit 1 'Cannot open the template file'
 fi
-if [ \( ! -r "$file_data" \) -a \( "_$file_data" != '_-' \) ]; then
-  printf '%s: Cannot open the data file\n' "${0##*/}" 1>&2
-  exit 1
+if [ ! -r "$file_data" ] && [ "_$file_data" != '_-' ]; then
+  error_exit 1 'Cannot open the data file'
 fi
 case "$file_tmpl" in ''|-|/*|./*|../*) :;; *) file="./$file_tmpl";; esac
 case "$file_data" in ''|-|/*|./*|../*) :;; *) file="./$file_data";; esac
 
-# main
+
+######################################################################
+# Main Routine
+######################################################################
+
 export v1=$file_tmpl
-export v2=$label
-export v3=$asnull
+export v2=$file_data
+export v3=$label
+export v4=$asnull
 exec awk '
 # the alternative length function for array variable
 function arlen(ar,i,l){for(i in ar){l++;}return l;}
@@ -102,15 +184,17 @@ BEGIN {
   #
   OFS="";
   ORS="";
-  file_tmpl = (ENVIRON["v1"]!="-") ? ENVIRON["v1"] : "/dev/stdin";
-  label     = ENVIRON["v2"];
-  asnull    = ENVIRON["v3"];
+  file_tmpl = ENVIRON["v1"];
+  file_data = ENVIRON["v2"];
+  label     = ENVIRON["v3"];
+  asnull    = ENVIRON["v4"];
   split("", line_buf);
 
   # ===== Pass through the lines until the line contains the 1st label
   #
   if (label != "") {
-    while (getline line < file_tmpl) {
+    '"$tmplfromF"'while (getline line < file_tmpl) {
+    '"$tmplfrom0"'while (getline line            ) {
       if (index(line, label)) {break;}
       print line, "\n";
     }
@@ -119,13 +203,15 @@ BEGIN {
   # ===== mojihame until the line contains the 2nd label =============
   #
   # --- 1) memorize the template lines between the labels ------------
-  for (i=0; (getline line < file_tmpl); i++) {
+  '"$tmplfromF"'for (i=0; (getline line < file_tmpl); i++) {
+  '"$tmplfrom0"'for (i=0; (getline line            ); i++) {
     if ((label!="") && index(line, label)) {break;}
     line_buf[i] = line;
   }
   #
   # --- 2) mojihame every line in data to the memorized template -----
-  while (getline) {
+  '"$datafromF"'while (getline < file_data) {
+  '"$datafrom0"'while (getline            ) {
     split("", data_buf);
     for (i=1; i<=NF; i++) {
       s = $i;
@@ -160,9 +246,10 @@ BEGIN {
 
   # ===== Pass through the lines again ===============================
   #
-  while (getline line < file_tmpl) {
+  '"$tmplfromF"'while (getline line < file_tmpl) {
+  '"$tmplfrom0"'while (getline line            ) {
     print line, "\n";
   }
 
 }
-' "$file_data"
+'
