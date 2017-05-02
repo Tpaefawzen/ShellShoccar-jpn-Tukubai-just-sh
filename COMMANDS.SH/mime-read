@@ -11,7 +11,7 @@
 #        -v .... Just lists the names which are contained in the MIME data
 #
 # Designed originally by Nobuaki Tounaka
-# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-04-17
+# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 202017-05-02
 #
 # This is a public-domain software (CC0). It means that all of the
 # people can use this for any purposes with no restrictions at all.
@@ -29,7 +29,8 @@
 set -u
 umask 0022
 export LC_ALL=C
-export PATH="$(command -p getconf PATH)${PATH:+:}${PATH:-}"
+export PATH="$(command -p getconf PATH)${PATH+:}${PATH-}"
+export UNIX_STD=2003  # to make HP-UX conform to POSIX
 
 # === Define the functions for printing usage and error message ======
 print_usage_and_exit () {
@@ -37,7 +38,7 @@ print_usage_and_exit () {
 	Usage   : ${0##*/} [-v] <name> <MIME-file>
 	Args    : <MIME-file> .. MIME data file
 	Options : -v .... Just lists the names which are contained in the MIME data
-	Version : 2017-04-17 16:32:57 JST
+	Version : 202017-05-02 21:11:01 JST
 	          Open usp Tukubai (POSIX Bourne Shell/POSIX commands)
 	            * Although GNU AWK produces better performance than the
 	              other AWKs
@@ -87,13 +88,22 @@ case $1 in
 esac
 
 # === Validate the arguments =========================================
-if [ ! -f "$mime_file"     ] &&
-   [ ! -c "$mime_file"     ] &&
-   [ ! -p "$mime_file"     ] &&
-   [ "_$mime_file" != '_-' ]  ; then
-  error_exit 1 'Cannot open the file: $mime_file'
+use_stdin=0
+if   [ "_$mime_file" = '_'                ] ||
+     [ "_$mime_file" = '_-'               ] ||
+     [ "_$mime_file" = '_/dev/stdin'      ] ||
+     [ "_$mime_file" = '_/dev/fd/0'       ] ||
+     [ "_$mime_file" = '_/proc/self/fd/0' ]  ; then
+  use_stdin=$((use_stdin+1))
+  mime_file=''
+elif [ -f "$mime_file"                    ] ||
+     [ -c "$mime_file"                    ] ||
+     [ -p "$mime_file"                    ]  ; then
+  [ -r "$mime_file" ] || error_exit 1 'Cannot open the file: '"$mime_file"
+else
+  print_usage_and_exit
 fi
-case "$mime_file" in -|/*|./*|../*) :;; *) file="./$mime_file";; esac
+case "$mime_file" in ''|-|/*|./*|../*) :;; *) mime_file="./$mime_file";; esac
 
 
 ######################################################################
@@ -469,12 +479,12 @@ esac
 
 # === main (B) : GNU AWK unavailable and without -v option ===========
 # (commands should not be run with "exec" because of having to remove tempfiles)
-if [ "_$mime_file" = '_-' ] || [ -c "$mime_file" ] || [ -p "$mime_file" ]; then
+case $use_stdin in [!0]*)
   make_temp_file
-  cat "$mime_file" > "$tmpfile"
+  cat > "$tmpfile"
   mime_file=$tmpfile
-fi
-st_ed_linenums=$(env -i v1="$name" "$CMD_AWK" "$awk_code" "$mime_file")
+;; esac
+st_ed_linenums=$(env v1="$name" "$CMD_AWK" "$awk_code" "$mime_file")
 ret=$?
 case $ret in 0) :;; *) exit_trap $ret;; esac
 st_linenum=${st_ed_linenums%:*}

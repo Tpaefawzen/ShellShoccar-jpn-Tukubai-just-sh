@@ -22,7 +22,7 @@
 #                      or "checkbox}" 
 #
 # Designed originally by Nobuaki Tounaka
-# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-04-04
+# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 202017-05-02
 #
 # This is a public-domain software (CC0). It means that all of the
 # people can use this for any purposes with no restrictions at all.
@@ -40,7 +40,8 @@
 set -u
 umask 0022
 export LC_ALL=C
-export PATH="$(command -p getconf PATH)${PATH:+:}${PATH:-}"
+export PATH="$(command -p getconf PATH)${PATH+:}${PATH-}"
+export UNIX_STD=2003  # to make HP-UX conform to POSIX
 
 # === Define the functions for printing usage and error message ======
 print_usage_and_exit () {
@@ -59,7 +60,7 @@ print_usage_and_exit () {
 	                        in the data from <param_file> even though the same
 	                        variables exist <html> as a <input type="radio">
 	                        or "checkbox}" 
-	Version : 2017-04-04 14:29:11 JST
+	Version : 202017-05-02 21:11:01 JST
 	          Open usp Tukubai (POSIX Bourne Shell/POSIX commands)
 	USAGE
   exit 1
@@ -91,7 +92,7 @@ param_file=''
 case $# in [!0]*)
   optmode=''
   i=0
-  for arg in "$@"; do
+  for arg in ${1+"$@"}; do
     i=$((i+1))
     case "$optmode" in '')
       case "$arg" in
@@ -146,25 +147,37 @@ esac
 
 # === Validate the arguments =========================================
 use_stdin=0
-case "$param_file" in '') param_file='-';; esac
-case "$param_file" in '-'|'/dev/stdin'|'/dev/fd/0'|'/proc/self/fd/0')
-  use_stdin=$((use_stdin+1));;
-esac
-case "$tmpl_file"  in '-'|'/dev/stdin'|'/dev/fd/0'|'/proc/self/fd/0')
-  use_stdin=$((use_stdin+1));;
-esac
-if [ $use_stdin -gt 1 ]; then print_usage_and_exit; fi
-case "$tmpl_file"  in ''|-|/*|./*|../*) :;; *)  tmpl_file="./$tmpl_file" ;; esac
-case "$param_file" in ''|-|/*|./*|../*) :;; *) param_file="./$param_file";; esac
-[ ! -f "$param_file"     ] &&
-[ ! -c "$param_file"     ] &&
-[ ! -p "$param_file"     ] &&
-[ "_$param_file" != '_-' ] && {
+if   [ "_$param_file" = '_'                ] ||
+     [ "_$param_file" = '_-'               ] ||
+     [ "_$param_file" = '_/dev/stdin'      ] ||
+     [ "_$param_file" = '_/dev/fd/0'       ] ||
+     [ "_$param_file" = '_/proc/self/fd/0' ]  ; then
+  use_stdin=$((use_stdin+1))
+  param_file=''
+elif [ -f "$param_file"                    ] ||
+     [ -c "$param_file"                    ] ||
+     [ -p "$param_file"                    ]  ; then
+  [ -r "$param_file" ] || error_exit 1 'Cannot open the file: '"$param_file"
+  case "$param_file" in /*|./*|../*) :;; *) param_file="./$param_file";; esac
+else
   print_usage_and_exit
-}
-[ ! -r "$param_file" ] && [ "_$param_file" != '_-' ] && {
-  error_exit 1 'Cannot open the file as a param_file'
-}
+fi
+if   [ "_$tmpl_file"  = '_'                ] ||
+     [ "_$tmpl_file"  = '_-'               ] ||
+     [ "_$tmpl_file"  = '_/dev/stdin'      ] ||
+     [ "_$tmpl_file"  = '_/dev/fd/0'       ] ||
+     [ "_$tmpl_file"  = '_/proc/self/fd/0' ]  ; then
+  use_stdin=$((use_stdin+1))
+  tmpl_file='-'  # set '-' when stdin is meant to tell from unset case
+elif [ -f "$tmpl_file"                     ] ||
+     [ -c "$tmpl_file"                     ] ||
+     [ -p "$tmpl_file"                     ]  ; then
+  [ -r "$tmpl_file"  ] || error_exit 1 'Cannot open the file: '"$tmpl_file"
+  case "$tmpl_file"  in /*|./*|../*) :;; *)  tmpl_file="./$tmpl_file" ;; esac
+else
+  print_usage_and_exit
+fi
+[ $use_stdin -gt 1 ] && error_exit 1 'Not allowed to open STDIN more than once'
 
 
 ######################################################################
@@ -173,14 +186,7 @@ case "$param_file" in ''|-|/*|./*|../*) :;; *) param_file="./$param_file";; esac
 
 # === Extract variable name from the template file if exists =========
 tmplvars=''
-if [ -f "$tmpl_file"      ] ||
-   [ -c "$tmpl_file"      ] ||
-   [ -p "$tmpl_file"      ] ||
-   [ "_$tmpl_file" = '_-' ]   ;
-then
-  [ ! -r "$tmpl_file" ] && [ "_$tmpl_file" != '_-' ] && {
-    error_exit 1 'Cannot open the file as a template file'
-  }
+case "$tmpl_file" in '') :;; *)
   tmplvars=$(cat "$tmpl_file"                                               |
              tr '\r\n' '  '                                                 |
              grep ^                                                         |
@@ -197,9 +203,7 @@ then
              tr '\n' ' '                                                    |
              grep ^                                                         |
              sed 's/ $//'                                                   )
-elif [ -n "$tmpl_file" ]; then
-  print_usage_and_exit
-fi
+;; esac
 
 
 ######################################################################
@@ -208,7 +212,7 @@ fi
 
 # === transfer the CGI variables string to the "Unicage name format" =
 export   opte opte_is_set   opts opts_is_set   optn   tmplvars
-grep ^ "$param_file"                                     |
+grep '' ${param_file:+"$param_file"}                     |
 sed 's/\(%[0-9A-Fa-f][0-9A-Fa-f]\)/'"$LFs"'\1'"$LFs"'/g' |
 sed '/^%/y/abcdef/ABCDEF/'                               |
 tr -d '\n'                                               |

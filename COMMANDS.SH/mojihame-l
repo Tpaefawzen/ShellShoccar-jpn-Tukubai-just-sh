@@ -41,7 +41,7 @@
 #                         See -d option for detail.
 #
 # Designed originally by Nobuaki Tounaka
-# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-04-18
+# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 202017-05-02
 #
 # This is a public-domain software (CC0). It means that all of the
 # people can use this for any purposes with no restrictions at all.
@@ -59,7 +59,8 @@
 set -u
 umask 0022
 export LC_ALL=C
-export PATH="$(command -p getconf PATH)${PATH:+:}${PATH:-}"
+export PATH="$(command -p getconf PATH)${PATH+:}${PATH-}"
+export UNIX_STD=2003  # to make HP-UX conform to POSIX
 
 # === Define the functions for printing usage and error message ======
 print_usage_and_exit () {
@@ -73,7 +74,7 @@ print_usage_and_exit () {
 	                       is "NULL", the macro "%2" will be replaced "" instead
 	                       of "NULL".
 	          -l<label> .. Set the border string of the mojihame paragraph
-	Version : 2017-04-18 16:34:07 JST
+	Version : 202017-05-02 21:11:01 JST
 	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
 	USAGE
   exit 1
@@ -119,7 +120,6 @@ for arg in "$@"; do
   if [ -z "$optmode" ]; then
     if   [ "_$arg" != "_${arg#-l}" ]; then
       label=${arg#-l}
-      [ -z "$label" ] && optmode='l'
     elif [ "_$arg" != "_${arg#-d}" ]; then
       asnull=${arg#-d}
     elif [ $i -eq $(($#-1)) ]; then
@@ -127,9 +127,6 @@ for arg in "$@"; do
     else
       print_usage_and_exit
     fi
-  elif [ "$optmode" = 'l' ]; then
-    label=$arg
-    optmode=''
   else
     print_usage_and_exit
   fi
@@ -137,34 +134,38 @@ done
 
 # === Validate the arguments =========================================
 [ -n "$file_tmpl" ] || print_usage_and_exit
-[ -n "$file_data" ] || file_data='-'
 use_stdin=0
-i=0
-for file in "$file_tmpl" "$file_data"; do
-  if [ "_$file" = '_-'               ] ||
-     [ "_$file" = '_/dev/stdin'      ] ||
-     [ "_$file" = '_/dev/fd/0'       ] ||
-     [ "_$file" = '_/proc/self/fd/0' ]  ;
-  then
-    use_stdin=$((use_stdin+1))
-    case $i in
-      0) tmplfromF='#'; tmplfrom0='';;
-      *) datafromF='#'; datafrom0='';;
-    esac
-  fi
-  i=$((i+0))
-done
-[ $use_stdin -le 1 ] || {
-  error_exit 1 'STDIN cannot be used for <template> and <data> at the same time'
-}
-if [ ! -r "$file_tmpl" ] && [ "_$file_tmpl" != '_-' ]; then
-  error_exit 1 'Cannot open the template file'
+if   [ "_$file_tmpl" = '_'                ] ||
+     [ "_$file_tmpl" = '_-'               ] ||
+     [ "_$file_tmpl" = '_/dev/stdin'      ] ||
+     [ "_$file_tmpl" = '_/dev/fd/0'       ] ||
+     [ "_$file_tmpl" = '_/proc/self/fd/0' ]  ; then
+  use_stdin=$((use_stdin+1))
+  file_tmpl=''; tmplfromF='#'; tmplfrom0=''
+elif [ -f "$file_tmpl"                    ] ||
+     [ -c "$file_tmpl"                    ] ||
+     [ -p "$file_tmpl"                    ]  ; then
+  [ -r "$file_tmpl" ] || error_exit 1 'Cannot open the file: '"$file_tmpl"
+  case "$file_tmpl" in /*|./*|../*) :;; *) file_tmpl="./$file_tmpl";; esac
+else
+  print_usage_and_exit
 fi
-if [ ! -r "$file_data" ] && [ "_$file_data" != '_-' ]; then
-  error_exit 1 'Cannot open the data file'
+if   [ "_$file_data"  = '_'                ] ||
+     [ "_$file_data"  = '_-'               ] ||
+     [ "_$file_data"  = '_/dev/stdin'      ] ||
+     [ "_$file_data"  = '_/dev/fd/0'       ] ||
+     [ "_$file_data"  = '_/proc/self/fd/0' ]  ; then
+  use_stdin=$((use_stdin+1))
+  file_data=''; datafromF='#'; datafrom0=''
+elif [ -f "$file_data"                     ] ||
+     [ -c "$file_data"                     ] ||
+     [ -p "$file_data"                     ]  ; then
+  [ -r "$file_data" ] || error_exit 1 'Cannot open the file: '"$file_data"
+  case "$file_data" in /*|./*|../*) :;; *) file_data="./$file_data";; esac
+else
+  print_usage_and_exit
 fi
-case "$file_tmpl" in ''|-|/*|./*|../*) :;; *) file="./$file_tmpl";; esac
-case "$file_data" in ''|-|/*|./*|../*) :;; *) file="./$file_data";; esac
+[ $use_stdin -gt 1 ] && error_exit 1 'Not allowed to open STDIN more than once'
 
 
 ######################################################################
