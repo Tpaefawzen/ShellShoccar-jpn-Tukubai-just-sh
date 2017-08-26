@@ -1,25 +1,81 @@
-#! /bin/sh
+#!/bin/sh
 
-# designed by Nobuaki Tounaka
-# written by 321516
+######################################################################
+#
+# ZEN - Converter From "Hankaku" (Japanese Halfwidth) Characters  To
+#       "Zenkaku" (Japanese Fullwidth) Characters
+#
+# USAGE: zen [-k] <file>
+#        zen [+<n>h] [-k] <f1> <f2> ... <file>
+#        zen -d [-k] <string>
+#
+#        <fn> .... field number you want to convert (All characters will
+#                  be converted when you set no <fn> arguments)
+#        <file> .. Text file you want to convert
+#        <string>  It will be explained in -d option
+#        -d ...... Direct Mode :
+#                  It make this command regard the last argument (<string>)
+#                  as a field formatted string instead of <file>
+#        +<n>h ... Regards the top <n> lines as comment and Print without
+#                  converting
+#        -k ...... Convert only "Katakana" characters
+#
+# Designed originally by Nobuaki Tounaka
+# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-08-26
+#
+# This is a public-domain software (CC0). It means that all of the
+# people can use this for any purposes with no restrictions at all.
+# By the way, we are fed up with the side effects which are brought
+# about by the major licenses.
+#
+######################################################################
 
-# print the usage and exit
-print_usage_and_exit () {
-  cat <<-__USAGE 1>&2
-	Usage   : ${0##*/} [+<n>h] [-k] <f1> <f2> ... <file>
-	        : ${0##*/} -d [-k] <string>
-	Version : Wed Sep 23 17:35:19 JST 2015
-	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands/UTF-8)
-__USAGE
-  exit 1
-}
 
-# initialize
+######################################################################
+# Initial Configuration
+######################################################################
+
+# === Initialize shell environment ===================================
 set -u
 umask 0022
-PATH='/usr/bin:/bin'
-IFS=$(printf ' \t\n_'); IFS=${IFS%_}
-export IFS LANG=C LC_ALL=C PATH
+export LC_ALL=C
+type command >/dev/null 2>&1 && type getconf >/dev/null 2>&1 &&
+export PATH="$(command -p getconf PATH)${PATH+:}${PATH-}"
+export UNIX_STD=2003  # to make HP-UX conform to POSIX
+
+# === Define the functions for printing usage and error message ======
+print_usage_and_exit () {
+  cat <<-USAGE 1>&2
+	Usage: ${0##*/} [-k] <file>
+	       ${0##*/} [+<n>h] [-k] <f1> <f2> ... <file>
+	       ${0##*/} -d [-k] <string>
+	Args    : <fn> .... field number you want to convert (All characters will
+	                    be converted when you set no <fn> arguments)
+	          <file> .. Text file you want to convert
+	          <string>  It will be explained in -d option
+	Options : -d ...... Direct Mode :
+	                    It make this command regard the last argument (<string>)
+	                    as a field formatted string instead of <file>
+	          +<n>h ... Regards the top <n> lines as comment and Print without
+	                    converting
+	          -k ...... Convert only "Katakana" characters
+	Version : 2017-08-26 13:54:53 JST
+	          Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands/UTF-8)
+	USAGE
+  exit 1
+}
+error_exit() {
+  ${2+:} false && echo "${0##*/}: $2" 1>&2
+  exit $1
+}
+
+
+######################################################################
+# Parse Arguments
+######################################################################
+
+# === Get the options and the filepath ===============================
+# --- initialize option parameters -----------------------------------
 directmode=0
 directstr=''
 kanaonly=''
@@ -29,83 +85,72 @@ fldnums=''
 all_fields=0
 use_stdin=0
 opt_part=1
-hopt=0
-
-# parse the arguments
-if [ \( $# -eq 1 \) ]; then
-  case $1 in
-    -h|--help|--version) print_usage_and_exit;;
-  esac
-fi
-case $# in [!0]*)
-  i=0
-  for arg in "$@"; do
-    i=$((i+1))
-    fldnum=''
-    # direct mode processing
-    if   [ \( $opt_part -ne 0 \) -a \( "_$arg" = '_-d'        \) ]; then
-      directmode=1
-      continue
-    elif [ \( $opt_part -ne 0 \) -a \( "_$arg" = '_-dk'       \) ]; then
-      directmode=1
-      kanaonly='#'
-      continue
-    elif [ \( $opt_part -ne 0 \) -a \( "_$arg" = '_-kd'       \) ]; then
-      directmode=1
-      kanaonly='#'
-      continue
-    elif [ \( $opt_part -ne 0 \) -a \( "_$arg" = '_-k'        \) ]; then
-      kanaonly='#'
-      continue
-    elif [ \( $opt_part -ne 0 \) -a \( "_$arg" != "_${arg#+}" \) ]; then
-      s=$(printf '%s\n' "$arg" | sed 's/^+\([0-9]*\)h$/\1/')
-      [ "_$s" != "_$arg" ] || print_usage_and_exit
-      [ -z "$s"          ] && { hopt=1; continue; }
-      hopt=$(expr $s + 0)
-      continue
-    fi
-    opt_part=0
-    if [ \( $i -eq $# \) -a \( $directmode -ne 0 \) ]; then
-      directstr=$arg
-      break
-    fi
-    # separate arg to arg1, arg2
-    arg1=${arg%%/*}
-    arg2=${arg##*/}
-    if [ \( "_${arg1}/${arg2}" = "_$arg"   \) -a \
-         \( -n "$arg1" \) -a \( -n "$arg2" \)    ]
-    then
-      :
-    else
-      arg1=$arg
-      arg2=''
-    fi
-    # check both
-    j=0
-    for s in $arg1 $arg2; do
-      if printf '%s\n' "$s" | grep -q '^[0-9]\{1,\}$'; then
-        j=$((j+1))
-        if [ "$s" -eq 0 ]; then
-          all_fields=1
-        fi
-      elif printf '%s\n' "$s" | grep -Eq '^(NF|NF-[0-9]+)$'; then
-        j=$((j+1))
+opth=0
+#
+# --- get them -------------------------------------------------------
+case "$#${1:-}" in 1-h|1-v|1--help|1--version) print_usage_and_exit;; esac
+i=0
+for arg in ${1+"$@"}; do
+  i=$((i+1))
+  fldnum=''
+  # direct mode processing
+  if   [ $opt_part -ne 0 ] && [ "_$arg" = '_-d'        ]; then
+    directmode=1
+    continue
+  elif [ $opt_part -ne 0 ] && [ "_$arg" = '_-dk'       ]; then
+    directmode=1
+    kanaonly='#'
+    continue
+  elif [ $opt_part -ne 0 ] && [ "_$arg" = '_-kd'       ]; then
+    directmode=1
+    kanaonly='#'
+    continue
+  elif [ $opt_part -ne 0 ] && [ "_$arg" = '_-k'        ]; then
+    kanaonly='#'
+    continue
+  elif [ $opt_part -ne 0 ] && [ "_$arg" != "_${arg#+}" ]; then
+    s=$(printf '%s\n' "$arg" | sed 's/^+\([0-9]*\)h$/\1/')
+    [ "_$s" != "_$arg" ] || print_usage_and_exit
+    [ -z "$s"          ] && { opth=1; continue; }
+    opth=$(expr $s + 0)
+    continue
+  fi
+  opt_part=0
+  if [ $i -eq $# ] && [ $directmode -ne 0 ]; then
+    directstr=$arg
+    break
+  fi
+  # separate arg to arg1, arg2
+  arg1=${arg%%/*}
+  arg2=${arg##*/}
+  if [ "_${arg1}/${arg2}" != "_$arg" ] || [ -z "$arg1" ] || [ -z "$arg2" ]; then
+    arg1=$arg
+    arg2=''
+  fi
+  # check both
+  j=0
+  for s in $arg1 $arg2; do
+    if printf '%s\n' "$s" | grep -q '^[0-9]\{1,\}$'; then
+      j=$((j+1))
+      if [ "$s" -eq 0 ]; then
+        all_fields=1
       fi
-    done
-    if [ \( $j -eq 2 \) -o \( \( $j -eq 1 \) -a \( -z "$arg2" \) \) ]; then
-      fldnums="$fldnums $arg"
-      continue
+    elif printf '%s\n' "$s" | grep -Eq '^(NF|NF-[0-9]+)$'; then
+      j=$((j+1))
     fi
-    # perhaps, this argument is a filename
-    if [ $# -eq $i ]; then
-      file=$arg
-      continue
-    fi
-    # otherwise, it is a invalid argument
-    print_usage_and_exit
   done
-  ;;
-esac
+  if [ $j -eq 2 ] || ([ $j -eq 1 ] && [ -z "$arg2" ]); then
+    fldnums="$fldnums $arg"
+    continue
+  fi
+  # perhaps, this argument is a filename
+  if [ $# -eq $i ]; then
+    file=$arg
+    continue
+  fi
+  # otherwise, it is a invalid argument
+  print_usage_and_exit
+done
 # (if you want to regard no fldnums as all, set all_fields=1 instead of exit)
 [ -n "$fldnums" ] || all_fields=1
 if [ $directmode -ne 0 ]; then
@@ -113,27 +158,26 @@ if [ $directmode -ne 0 ]; then
   file=''
 else
   [ -n "$file" ] || file='-'
-  if [ \( "_$file" = '_-'               \) -o \
-       \( "_$file" = '_/dev/stdin'      \) -o \
-       \( "_$file" = '_/dev/fd/0'       \) -o \
-       \( "_$file" = '_/proc/self/fd/0' \)    ]
-  then
-    use_stdin=$((use_stdin+1))
-  fi
-  if [ \( ! -f "$file"     \) -a \
-       \( ! -c "$file"     \) -a \
-       \( ! -p "$file"     \) -a \
-       \( "_$file" != '_-' \)    ]
-  then
+  case "$file" in
+     -|/dev/stdin|/dev/fd/0|/proc/self/fd/0) use_stdin=$((use_stdin+1));;
+  esac
+  if   [ ! -f "$file"     ] &&
+       [ ! -c "$file"     ] &&
+       [ ! -p "$file"     ] &&
+       [ "_$file" != '_-' ]  ; then
     print_usage_and_exit
-  elif [ \( ! -r "$file" \) -a \( "_$file" != '_-' \) ]; then
-    printf '%s: Cannot open the file\n' "${0##*/}" 1>&2
-    exit 1
+  elif [ ! -r "$file" ] && [ "_$file" != '_-' ]; then
+    error_exit 1 'Cannot open the file'
   fi
 fi
 case "$file" in ''|-|/*|./*|../*) :;; *) file="./$file";; esac
 
-# make the part of the awk code
+
+######################################################################
+# Prepare for the Main Routine
+######################################################################
+
+# === Generate the partial code for AWK ==============================
 if [ $all_fields -eq 0 ]; then
   awkc0=$(echo "$fldnums"                           |
           sed 's/^0\{1,\}\([0-9]\)/\1/'             |
@@ -265,7 +309,7 @@ else
   awkc0b=''
 fi
 
-# make awk code
+# === Generate the AWK code for zen operation ========================
 awkcode='
 BEGIN {
   for (i=0; i<hdr_skip; i++) {
@@ -340,177 +384,173 @@ function utf8han2zen_prep() {
 
 function utf8han2zen(s_in, i,s,s0,s1,s2,s_out) {
   s_out = "";
-  s0    = "";   # 濁音の可能性がある文字が入る一時バッファ
+  s0    = "";   # Buffer for character which may be followed by a sonant mark
   for (i=1; i<=length(s_in); i++) {
     s = substr(s_in,i,1);
     if (s0 == "") {
-      # a. 一時バッファに溜まってない場合
+      # a. In the case that "s0 buf." has nothing
       if        (s < "\200") {
-        # a-1. 1バイト文字の場合
+        # a-1. 1-byte UTF-8 character
         '$kanaonly'if ((s >= "\040") && (s < "\177")) {
-        '$kanaonly'  # a-1-1. 全角に変換できる場合
-        '$kanaonly'  s_out = s_out h2za[s];
+        '$kanaonly'  s_out = s_out h2za[s]; # a-1-1, transformable case
         '$kanaonly'} else {
-        '$kanaonly'  # a-1-2. 全角に変換できない場合
-          s_out = s_out s;
+          s_out = s_out s; # a-1-2. intransformable case
         '$kanaonly'}
       } else if (s < "\300") {
-        # a-x1. 不正なUTF-8先頭バイト
+        # a-x1. Invalid UTF-8 code
         s_out = s_out s;
       } else if (s < "\340") {
-        # a-2. 2バイト文字の場合
+        # a-2. 2-byte UTF-8 character
         i++;
         s_out = s_out s substr(s_in,i,1);
       } else if (s < "\360") {
-        # a-3. 3バイト文字の場合
+        # a-3. 3-byte UTF-8 character
         s1 = substr(s_in,i+1,1);
         s2 = substr(s_in,i+2,1);
-        # === 半角カナ→全角カナ変換 =================================
+        # === "Katakana" transforming (halfwidth to fullwidth) =======
         if        (s == "\357") {
-          # a-3-1. 先頭がEFで始まる場合
+          # a-3-1. If the 1st byte is 0xEF
           if        (s1 == "\275") {
-            # a-3-1-1. 2バイト目がBDの場合
+            # a-3-1-1. If the 2nd byte is 0xBD
             if        ((s2 >= "\241") && (s2 < "\266")) {
-              # a-3-1-1-1. 3バイト目がA1～B5の場合
-              s_out = s_out h2zk[s s1 s2]; # <<< 。「」、・ア～オ(清音のみ)
+              # a-3-1-1-1. If the 3rd byte is between 0xA1 and 0xB5
+              s_out = s_out h2zk[s s1 s2]; # <<< "。「」、・ア...オ(non-vocal)"
             } else if ((s2 >= "\266") && (s2 < "\300")) {
-              # a-3-1-1-2. 3バイト目がB6～BFの場合
-              s0 = s s1 s2;                # <<< カ～ソ(濁音の可能性も)
+              # a-3-1-1-2. If the 3rd byte is between 0xB6 and 0xBF
+              s0 = s s1 s2;                # <<< "カ...ソ(non-vocal or vocal)"
             } else {
-              # a-3-1-1-3. 3バイト目がA1～BF以外の場合
+              # a-3-1-1-3. If the 3rd byte is except between 0xA1 and 0xBF
               s_out = s_out s s1 s2;
             }
           } else if (s1 == "\276") {
-            # a-3-1-2. 2バイト目がBEの場合
+            # a-3-1-2. If the 2nd byte is 0xBE
             if        (((s2 >= "\200") && (s2 < "\205")) ||
                        ((s2 >= "\212") && (s2 < "\217"))   ) {
-              # a-3-1-2-1. 3バイト目が80～84,8A～8Eの場合
-              s0 = s s1 s2;                # <<< タ～ト,ハ～ホ(濁音の可能性も)
+              # a-3-1-2-1. If the 3rd byte is (0x80-0x84) or (0x8A-0x8E)
+              s0 = s s1 s2;            # <<< "タ～ト,ハ～ホ(non-vocal or vocal)"
             } else if ( (s2 >= "\205") && (s2 < "\240")    ) {
-              # a-3-1-2-2. 3バイト目が85～89,8F～9Fの場合
-              s_out = s_out h2zk[s s1 s2]; # <<< ナ～ノ、マ～ン(清音のみ)
+              # a-3-1-2-2. If the 3rd byte is (0x85-0x89) or (0x8F-0x9F)
+              s_out = s_out h2zk[s s1 s2]; # <<< "ナ～ノ,マ～ン(non-vocal)゛゜"
             } else {
-              # a-3-1-2-3. 3バイト目がA1～BF以外の場合
+              # a-3-1-2-3. If the 3rd byte is except between 0x80 and 0x9F
               s_out = s_out s s1 s2;
             }
           } else {
-            # a-3-1-3. 2バイト目がBD,BEでない場合
+            # a-3-1-3. If the 2nd byte is neither 0xBD nor 0xBE
             s_out = s_out s s1 s2;
           }
         } else {
-          # a-3-2. 先頭がEF以外で始まる場合
+          # a-3-2. If the 1st byte is except 0xEF
           s_out = s_out s s1 s2;
         }
         # ============================================================
         i += 2;
       } else if (s < "\370") {
-        # a-4. 4バイト文字の場合
+        # a-4. 4-byte UTF-8 character
         s_out = s_out s substr(s_in,i+1,3);
         i += 3;
       } else if (s < "\374") {
-        # a-5. 5バイト文字の場合
+        # a-5. 5-byte UTF-8 character
         s_out = s_out s substr(s_in,i+1,4);
         i += 4;
       } else if (s < "\376") {
-        # a-6. 6バイト文字の場合
+        # a-6. 6-byte UTF-8 character
         s_out = s_out s substr(s_in,i+1,5);
         i += 5;
       } else {
-        # a-x2. 不正なUTF-8先頭バイト
+        # a-x2. Invalid UTF-8 character
         s_out = s_out s;
       }
     } else {
-      # b. 一時バッファに溜まっている場合
+      # b. In the case that "s0 buf." has anything
       if        (s < "\200") {
-        # b-1. 1バイト文字の場合
+        # b-1. 1-byte UTF-8 character
         '$kanaonly'if ((s >= "\040") && (s < "\177")) {
-        '$kanaonly'  # b-1-1. 全角に変換できる場合
-        '$kanaonly'  s_out = s_out h2zk[s0] h2za[s];
+        '$kanaonly'  s_out = s_out h2zk[s0] h2za[s]; # b-1-1. transformable case
         '$kanaonly'} else {
-        '$kanaonly'  # b-1-2. 全角に変換できない場合
-          s_out = s_out h2zk[s0] s;
+          s_out = s_out h2zk[s0] s; # b-1-2. intransformable case
         '$kanaonly'}
         s0 = "";
       } else if (s < "\300") {
-        # b-x1. 不正なUTF-8先頭バイト
+        # b-x1. Invalid UTF-8 character
         s_out = s_out h2zk[s0] s;
         s0 = "";
       } else if (s < "\340") {
-        # b-2. 2バイト文字の場合
+        # b-2. 2-byte UTF-8 character
         i++;
         s_out = s_out h2zk[s0] s substr(s_in,i,1);
         s0 = "";
       } else if (s < "\360") {
-        # a-3. 3バイト文字の場合
+        # a-3. 3-byte UTF-8 character
         s1 = substr(s_in,i+1,1);
         s2 = substr(s_in,i+2,1);
-        # === 半角カナ→全角カナ変換 =================================
+        # === "Katakana" transforming (halfwidth to fullwidth) =======
         if        (s == "\357") {
-          # b-3-1. 先頭がEFで始まる場合
+          # b-3-1. If the 1st byte is 0xEF
           if        (s1 == "\275") {
-            # b-3-1-1. 2バイト目がBDの場合
+            # b-3-1-1. If the 2nd byte is 0xBD
             if        ((s2 >= "\241") && (s2 < "\266")) {
-              # b-3-1-1-1. 3バイト目がA1～B5の場合
-              s_out = s_out h2zk[s0] h2zk[s s1 s2]; # <<< 。「」、・ア～オ(清音)
+              # b-3-1-1-1. If the 3rd byte is between 0xA1 and 0xB5
+              s_out = s_out h2zk[s0] h2zk[s s1 s2]; # <<<"。「」、・ア...オ(nv)"
               s0 = "";
             } else if ((s2 >= "\266") && (s2 < "\300")) {
-              # b-3-1-1-2. 3バイト目がB6～BFの場合
-              s_out = s_out h2zk[s0];               # <<< カ～ソ(濁音の可能性も)
+              # b-3-1-1-2. If the 3rd byte is between 0xB6 and 0xBF
+              s_out = s_out h2zk[s0];               # <<< "カ...ソ(nv or v)"
               s0 = s s1 s2;
             } else {
-              # b-3-1-1-3. 3バイト目がA1～BF以外の場合
+              # b-3-1-1-3. If the 3rd byte is except between 0xA1 and 0xBF
               s_out = s_out h2zk[s0] s s1 s2;
               s0 = "";
             }
           } else if (s1 == "\276") {
-            # b-3-1-2. 2バイト目がBEの場合
+            # b-3-1-2. If the 2nd byte is 0xBE
             if         ((s2 == "\236") || (s2 == "\237")   ) {
-              # b-3-1-2-1. 3バイト目が9E,9Fの場合
-              s_out = s_out h2zd[s0 s s1 s2];       # <<< 濁点・半濁点
+              # b-3-1-2-1. If the 3rd byte is 0x9E or 0x9F
+              s_out = s_out h2zd[s0 s s1 s2];       # <<< sonant marks
               s0 = "";
             } else if (((s2 >= "\200") && (s2 < "\205")) ||
                        ((s2 >= "\212") && (s2 < "\217"))   ) {
-              # b-3-1-2-2. 3バイト目が80～84,8A～8Eの場合
-              s_out = s_out h2zk[s0];        # <<< タ～ト,ハ～ホ(濁音の可能性も)
+              # b-3-1-2-2. If the 3rd byte is (0x80-0x84) or (0x8A-0x8E)
+              s_out = s_out h2zk[s0];        # <<< "タ～ト,ハ～ホ(nv or v)"
               s0 = s s1 s2;
             } else if ( (s2 >= "\205") && (s2 < "\236")    ) {
-              # b-3-1-2-3. 3バイト目が85～89,8F～9Dの場合
-              s_out = s_out h2zk[s0] h2zk[s s1 s2]; # <<< ナ～ノ、マ～ン(清音)
+              # b-3-1-2-3. If the 3rd byte is (0x85-0x89) or (0x8F-0x9D)
+              s_out = s_out h2zk[s0] h2zk[s s1 s2]; # <<< "ナ～ノ,マ～ン(nv)"
               s0 = "";
             } else {
-              # b-3-1-2-4. 3バイト目がA1～BF以外の場合
+              # b-3-1-2-4. If the 3rd byte is except between 0x80 and 0x9F
               s_out = s_out h2zk[s0] s s1 s2;
               s0 = "";
             }
           } else {
-            # b-3-1-3. 2バイト目がBD,BEでない場合
+            # b-3-1-3. If the 2nd byte is neither 0xBD nor 0xBE
             s_out = s_out h2zk[s0] s s1 s2;
             s0 = "";
           }
         } else {
-          # b-3-2. 先頭がEF以外で始まる場合
+          # b-3-2. If the 1st byte is except 0xEF
           s_out = s_out h2zk[s0] s s1 s2;
           s0 = "";
         }
         # ============================================================
         i += 2;
       } else if (s < "\370") {
-        # a-4. 4バイト文字の場合
+        # a-4. 4-byte UTF-8 character
         s_out = s_out h2zk[s0] s substr(s_in,i+1,3);
         s0 = "";
         i += 3;
       } else if (s < "\374") {
-        # a-5. 5バイト文字の場合
+        # a-5. 5-byte UTF-8 character
         s_out = s_out h2zk[s0] s substr(s_in,i+1,4);
         s0 = "";
         i += 4;
       } else if (s < "\376") {
-        # a-6. 6バイト文字の場合
+        # a-6. 6-byte UTF-8 character
         s_out = s_out h2zk[s0] s substr(s_in,i+1,5);
         s0 = "";
         i += 5;
       } else {
-        # a-x2. 不正なUTF-8先頭バイト
+        # a-x2. Invalid UTF-8 character
         s_out = s_out h2zk[s0] s;
         s0 = "";
       }
@@ -523,13 +563,17 @@ function utf8han2zen(s_in, i,s,s0,s1,s2,s_out) {
 }
 '
 
-# main
+
+######################################################################
+# Main Routine
+######################################################################
+
 if [ $directmode -ne 0 ]; then
-  printf '%s' "$directstr"                |
-  env -i awk -v hdr_skip=$hopt "$awkcode"
+  printf '%s' "$directstr"         |
+  awk -v hdr_skip=$opth "$awkcode"
 else
-  (cat "$file"; printf '\n')              |
-  env -i awk -v hdr_skip=$hopt "$awkcode" |
+  (cat "$file"; echo)              |
+  awk -v hdr_skip=$opth "$awkcode" |
   awk 'BEGIN{
          ORS="";
          OFS="";
