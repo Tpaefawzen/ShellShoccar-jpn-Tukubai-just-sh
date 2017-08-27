@@ -1,60 +1,133 @@
-#! /bin/sh
+#!/bin/sh
 
-# designed by Nobuaki Tounaka
-# written by 321516
+######################################################################
+#
+# CJOIN1 - C-type join1 :
+#          A "join1" Command Which Can Accept A Non-sorted Transaction Textdata
+#
+# USAGE: cjoin1 [+ng[<fd>]] key=<key> <master> <tran>
+#
+#        key ..... Keyfiled number(s) by <key> for join operation in the
+#                  transaction data
+#                  * You can also use "@" and "/" characters to mean
+#                    multiplicate keys.
+#                    - "2@4@5" means "2nd, 4th and 5th fields should
+#                      be refferred as the keys"
+#                    - "2/5" means "Fields from 2nd to 5th should be
+#                      refferred as the keys"
+#                  * In the masterdata, the 1st key is always referred.
+#                    - When both key=1 and key=3, the 1st field is
+#                      referred in the masterdata.
+#                    - When key="2@4@5", 1st, 3rd and 4th fields are
+#                      referred in the masterdata.
+#        <master>  Text file which is a masterdata (joined from leftside)
+#        <tran> .. Text file which is a transaction data (joined from
+#                  rightside)
+#        +ng ..... Output the lines which can't be joined to
+#                  filedescriptor <fd>. (<fd>'s default is 2)
+#
+# Designed originally by Nobuaki Tounaka
+# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-08-27
+#
+# This is a public-domain software (CC0). It means that all of the
+# people can use this for any purposes with no restrictions at all.
+# By the way, we are fed up with the side effects which are brought
+# about by the major licenses.
+#
+######################################################################
 
-# print the usage and exit
+
+######################################################################
+# Initial Configuration
+######################################################################
+
+# === Initialize shell environment ===================================
+set -u
+umask 0022
+export LC_ALL=C
+type command >/dev/null 2>&1 && type getconf >/dev/null 2>&1 &&
+export PATH="$(command -p getconf PATH)${PATH+:}${PATH-}"
+export UNIX_STD=2003  # to make HP-UX conform to POSIX
+
+# === Define the functions for printing usage and error message ======
 print_usage_and_exit () {
-  cat <<-__USAGE 1>&2
+  cat <<-USAGE 1>&2
 	Usage   : ${0##*/} [+ng[<fd>]] key=<key> <master> <tran>
-	Version : Mon Oct 19 13:01:27 JST 2015
-	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands/UTF-8)
-__USAGE
+	Args    : <master>  Text file which is a masterdata (joined from leftside)
+	          <tran> .. Text file which is a transaction data (joined from
+	                    rightside)
+	Options : key ..... Keyfiled number(s) by <key> for join operation in the
+	                    transaction data
+	                    * You can also use "@" and "/" characters to mean
+	                      multiplicate keys.
+	                      - "2@4@5" means "2nd, 4th and 5th fields should
+	                        be refferred as the keys"
+	                      - "2/5" means "Fields from 2nd to 5th should be
+	                        refferred as the keys"
+	                    * In the masterdata, the 1st key is always referred.
+	                      - When both key=1 and key=3, the 1st field is
+	                        referred in the masterdata.
+	                      - When key="2@4@5", 1st, 3rd and 4th fields are
+	                        referred in the masterdata.
+	          +ng ..... Output the lines which can't be joined to
+	                    filedescriptor <fd>. (<fd>'s default is 2)
+	Version : 2017-08-27 02:54:02 JST
+	          Open usp Tukubai (POSIX Bourne Shell/POSIX commands/UTF-8)
+	USAGE
   exit 1
 }
+error_exit() {
+  ${2+:} false && echo "${0##*/}: $2" 1>&2
+  exit $1
+}
 
-
-# initialize
-PATH='/usr/bin:/bin'
-IFS=$(printf ' \t\n_'); IFS=${IFS%_}
-export IFS LANG=C LC_ALL=C
+# === Set other parameters ===========================================
 LF=$(printf '\\\n_');LF=${LF%_}
-set -u
+
+
+######################################################################
+# Parse Arguments
+######################################################################
+
+# === Get the options and the filepaths ==============================
+# --- initialize option parameters -----------------------------------
 ng=''
 key=''
 fldstr_t=''
 flds=''
 masterfile=''
 tranfile=''
-
-
-# validate the arguments
+#
+# --- get them -------------------------------------------------------
 case $# in [01]) print_usage_and_exit;; esac
 for arg in "$@"; do
   case "$arg" in
     key=*)
       key=${arg#key=}
       case "$key" in *NF*)
-        printf '%s\n' "${0##*/}: Cannot use NF in the key argument" 1>&2
-        exit 1
+        error_exit 1 'Sorry, NF cannot be use in this version'
         ;;
       esac
       ;;
     +ng*)
-      ng=${arg#+ng}
-      case "$ng" in '') ng=2;; esac
-      case "$ng" in *[!0-9]*) print_usage_and_exit;; esac
-      ng=$((ng+0))
+      i=${arg#+ng}
+      case "$i" in *[!0-9]*) print_usage_and_exit;; esac
+      case "$i" in '') i=2;;  *) i=$(expr $i + 0);; esac
+      case "$i" in 0) ng='/dev/stdin' ;;
+                   1) ng='/dev/stdout';;
+                   2) ng='/dev/stderr';;
+                   *) ng="/dev/fd/$i" ;;
+      esac
       ;;
     *)
       if [ -z "$masterfile" ]; then
-        if [ \( -f "$arg" \) -o \( -c "$arg" \) -o \( -p "$arg" \) -o \
-             \( "_$arg" = '_-' \)                                     ]; then
+        if [ -f "$arg" ] || [ -c "$arg" ] || [ -p "$arg" ] || [ "_$arg" = '_-' ]
+        then
           masterfile=$arg
         fi
       elif [ -z "$tranfile" ]; then
-        if [ \( -f "$arg" \) -o \( -c "$arg" \) -o \( -p "$arg" \) -o \
-             \( "_$arg" = '_-' \)                                     ]; then
+        if [ -f "$arg" ] || [ -c "$arg" ] || [ -p "$arg" ] || [ "_$arg" = '_-' ]
+        then
           tranfile=$arg
         fi
       else
@@ -68,48 +141,36 @@ case "$masterfile" in '') print_usage_and_exit;; esac
 case "$tranfile"   in '') tranfile='-'        ;; esac
 use_stdin=0
 for file in "$masterfile" "$tranfile"; do
-  if [ \( "_$file" = '_-'               \) -o \
-       \( "_$file" = '_/dev/stdin'      \) -o \
-       \( "_$file" = '_/dev/fd/0'       \) -o \
-       \( "_$file" = '_/proc/self/fd/0' \)    ]
-  then
-    use_stdin=$((use_stdin+1))
-  fi
+  case "$file" in
+     -|/dev/stdin|/dev/fd/0|/proc/self/fd/0) use_stdin=$((use_stdin+1));;
+  esac
 done
-if [ $use_stdin -gt 1 ]; then
-  print_usage_and_exit
-fi
-if [ \( ! -r "$masterfile" \) -a \( "_$masterfile" != '_-' \) ]; then
-  printf '%s\n' "${0##*/}: Cannot open the master file" 1>&2
-  exit 1
-fi
-if [ \( ! -r "$tranfile" \) -a \( "_$tranfile" != '_-' \) ]; then
-  printf '%s\n' "${0##*/}: Cannot open the transaction file" 1>&2
-  exit 1
-fi
+case $use_stdin in [01]) :;; *) error_exit 1 'You cannot use STDIN twice';; esac
+[ -r "$masterfile" ] || [ "_$masterfile" = '_-' ] || {
+  error_exit 1 'Cannot open the master file'
+}
+[ -r "$tranfile"   ] || [ "_$tranfile"   = '_-' ] || {
+  error_exit 1 'Cannot open the transaction file'
+}
 case "$masterfile" in ''|-|/*|./*|../*) :;; *) masterfile="./$masterfile";; esac
 case "$tranfile"   in ''|-|/*|./*|../*) :;; *)   tranfile="./$tranfile"  ;; esac
 
-# validate the "key" argument and make the fields to compare from it
+# === validate the "key" argument and make the fields to compare from it
 dlm=''
 for arg in $(printf '%s\n' "$key" | tr '@' ' '); do
-  # "/" extraction mode (make arg2 if this mode)
+  # --- "/" extraction mode (make arg2 if this mode) -----------------
   arg1=${arg%%/*}
   arg2=${arg##*/}
-  if [ \( "_${arg1}/${arg2}" = "_$arg"   \) -a \
-       \( -n "$arg1" \) -a \( -n "$arg2" \)    ]
-  then
-    :
-  else
+  if [ "_${arg1}/${arg2}" != "_$arg" ] || [ -z "$arg1" ] || [ -z "$arg2" ]; then
     arg2=''
   fi
-  # get substr parameters from arg1 if possible
+  # --- get substr parameters from arg1 if possible ------------------
   stpos=0
   edpos=-1
   arg1s=${arg1#*.}
   arg1=${arg1%%.*}
   if [ "_$arg1s" != "_$arg1" ]; then
-    if printf '%s\n' "$arg1s" | grep -q '^[0-9]\{1,\}$'; then
+    if   printf '%s\n' "$arg1s" | grep -q '^[0-9]\{1,\}$'             ; then
       stpos=$arg1s
       if [ $stpos -eq 0 ]; then
         break
@@ -124,25 +185,23 @@ for arg in $(printf '%s\n' "$key" | tr '@' ' '); do
       break
     fi
   fi
-  # judge the field number type of arg1 (also arg2 if possible)
+  # --- judge the field number type of arg1 (also arg2 if possible) --
   if printf '%s\n' "$arg1" | grep -q '^[0-9]\{1,\}$'; then
     arg1type=1
   else
     arg1type=-1
   fi
-  if [ -z "$arg2" ]; then
+  if   [ -z "$arg2" ]                                 ; then
     arg2type=0
   elif printf '%s\n' "$arg2" | grep -q '^[0-9]\{1,\}$'; then
     arg2type=1
   else
     arg2type=-1
   fi
-  if [ \( $arg1type -lt 0 \) -o \( $arg2type -lt 0 \) ]; then
-    break
-  fi
-  # generate the string for the AWK-print
+  ([ $arg1type -lt 0 ] || [ $arg2type -lt 0 ]) && break
+  # --- generate the string for the AWK-print ------------------------
   if [ $arg2type -eq 0 ]; then
-    if [ $stpos -eq 0 ]; then
+    if   [ $stpos -eq 0    ]; then
       if [ $arg1type -eq 1 ]; then
         fldstr_t="$fldstr_t$dlm\$$arg1"
       else
@@ -156,28 +215,28 @@ for arg in $(printf '%s\n' "$key" | tr '@' ' '); do
       fi
     fi
   else
-    if [ \( $stpos -eq 0 \) -a \( $arg1 -le $arg2 \) ]; then
+    if   [ $stpos -eq 0 ] && [ $arg1 -le $arg2 ]; then
       j=$arg1
       while [ $j -le $arg2 ]; do
         fldstr_t="$fldstr_t${dlm}\$$j"
         dlm=' FS '
         j=$((j+1))
       done
-    elif [ \( $stpos -eq 0 \) -a \( $arg1 -ge $arg2 \) ]; then
+    elif [ $stpos -eq 0 ] && [ $arg1 -ge $arg2 ]; then
       j=$arg1
       while [ $j -ge $arg2 ]; do
         fldstr_t="$fldstr_t${dlm}\$$j"
         dlm=' FS '
         j=$((j-1))
       done
-    elif [ \( $stpos -ne 0 \) -a \( $arg1 -le $arg2 \) ]; then
+    elif [ $stpos -ne 0 ] && [ $arg1 -le $arg2 ]; then
       j=$arg1
       while [ $j -le $arg2 ]; do
         fldstr_t="$fldstr_t${dlm}getsubf(\$$j,$stpos,$edpos)"
         dlm=' FS '
         j=$((j+1))
       done
-    elif [ \( $stpos -ne 0 \) -a \( $arg1 -ge $arg2 \) ]; then
+    elif [ $stpos -ne 0 ] && [ $arg1 -ge $arg2 ]; then
       j=$arg1
       while [ $j -ge $arg2 ]; do
         fldstr_t="$fldstr_t${dlm}getsubf(\$$j,$stpos,$edpos)"
@@ -186,7 +245,7 @@ for arg in $(printf '%s\n' "$key" | tr '@' ' '); do
       done
     fi
   fi
-  # loop
+  # --- to the next lap ----------------------------------------------
   arg=''
   dlm=' FS '
 done
@@ -195,18 +254,23 @@ flds_t=$(echo "$fldstr_t"                               |
          sed 's/\$/'"$LF"'$/g'                          |
          sed -n '/^\$/{s/^\$\([0-9]\{1,\}\).*$/\1/;p;}' |
          sort -k 1n,1 -u                                |
-         tr '\n' ' '                                    |
-         sed 's/ $//'                                   )
+         tr '\n' ' '                                    )
+flds_t=${flds_t% *}
 minfldnum=${flds_t%% *}
-fldstr_m=$(echo "$fldstr_t"                                           |
-           sed 's/\$[0-9]\{1,\}/'"$LF"'&'"$LF"'/g'                    |
-           awk '/^\$/{print "$" substr($0,2)+1-'$minfldnum';next;} 1' |
-           tr -d '\n'                                                 )
+maxfldnum=${flds_t##* }
+fldstr_m=$(echo "$fldstr_t"                                         |
+           sed 's/\$[0-9]\{1,\}/'"$LF"'&'"$LF"'/g'                  |
+           awk '/^\$/{print "$" substr($0,2)+1-'$minfldnum';next;}  #
+                     {print;}                                     ' |
+           tr -d '\n'                                               )
 
 
-# join
-exec awk -v ng=$ng \
-'
+######################################################################
+# Main Routine
+######################################################################
+
+case "$ng" in '') ifng='#';; *) ifng='';; esac
+exec awk '
   # return the substr in accordance with the counting rule of self command
   function getsubf(str, startpos, len  ,i,p,l,l2,l3,st,ed) {
     # - "st" is a byte offset (start from 1) which the
@@ -270,8 +334,8 @@ exec awk -v ng=$ng \
 
   # prepare
   BEGIN {
-    fd = (ng != "") ? "/dev/fd/" ng : "";
     minfldnum = '$minfldnum';
+    maxfldnum = '$maxfldnum';
     split("'"$flds_t"'", ar);
     for (s in ar) {flds_t[ar[s]]=1;}
   }
@@ -281,24 +345,26 @@ exec awk -v ng=$ng \
     key_str = '"$fldstr_t"';
     if (key_str in masterkey) {
       rec_str = "";
-      for (i=1; i < minfldnum; i++) {
+      for (i=1; i <=maxfldnum; i++) {
         rec_str = rec_str FS $i;
       }
-      rec_str = rec_str FS masterkey[key_str];
-      for (i=minfldnum+1; i <= NF; i++) {
+      rec_str = rec_str masterkey[key_str];
+      for (i=maxfldnum+1; i<=NF; i++) {
         if (! (i in flds_t)) {rec_str = rec_str FS $i;}
       }
       print substr(rec_str,2);
-    } else if (fd != "") {
-      print > fd;
+    '"$ifng"'} else {
+    '"$ifng"'  print > "'"$ng"'";
     }
     next;
   }
 
   # load the keys in master
   {
-    key = "";
-    for (i=1; i<=NF; i++) {key = key FS $i;}
-    masterkey['"$fldstr_m"'] = substr(key,2);
+    iflds = ""; # fields which will be inserted between the transaction fields
+    for (i=maxfldnum-minfldnum+2; i<=NF; i++) {
+      iflds = iflds FS $i;
+    }
+    masterkey['"$fldstr_m"'] = iflds;
   }
 ' "$masterfile" "$tranfile"
