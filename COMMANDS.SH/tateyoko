@@ -1,28 +1,75 @@
-#! /bin/sh
+#!/bin/sh
 
-# designed by Nobuaki Tounaka
-# written by 321516
+######################################################################
+#
+# TATEYOKO - Exchange The Line Number And Field Number Of All Values
+#            (It looks like a transposed matrix)
+#
+# USAGE: tateyoko [-d[<string>]] <file>
+#
+#        <file> ...... Textfile you want to do it. The file must have
+#                      whitespace-separated fields. And the number of
+#                      fields in each line must be the same.
+#        -d<string> .. Dummy string by <string> for pudding lack fields
+#                      * With this option, even text files has lines
+#                        with different number of columns are accepted.
+#                      * "*" will be set as default when <string> is "".
+#
+# Designed originally by Nobuaki Tounaka
+# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-08-28
+#
+# This is a public-domain software (CC0). It means that all of the
+# people can use this for any purposes with no restrictions at all.
+# By the way, we are fed up with the side effects which are brought
+# about by the major licenses.
+#
+######################################################################
 
-# print the usage and exit
-print_usage_and_exit () {
-  cat <<-__USAGE 1>&2
-	Usage   : ${0##*/} [-d[<string>]] <file>
-	Version : 2017-07-18 00:23:25 JST
-	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
-__USAGE
-  exit 1
-}
 
-# initialize
+######################################################################
+# Initial Configuration
+######################################################################
+
+# === Initialize shell environment ===================================
 set -u
 umask 0022
-PATH='/usr/bin:/bin'
-IFS=$(printf ' \t\n_'); IFS=${IFS%_}
-export IFS LANG=C LC_ALL=C PATH
+export LC_ALL=C
+type command >/dev/null 2>&1 && type getconf >/dev/null 2>&1 &&
+export PATH="$(command -p getconf PATH)${PATH+:}${PATH-}"
+export UNIX_STD=2003  # to make HP-UX conform to POSIX
+
+# === Define the functions for printing usage and error message ======
+print_usage_and_exit () {
+  cat <<-USAGE 1>&2
+	Usage   : ${0##*/} [-d[<string>]] <file>
+	Args    : <file> ...... Textfile you want to do it. The file must have
+	                        whitespace-separated fields. And the number of
+	                        fields in each line must be the same.
+	Options : -d<string> .. Dummy string by <string> for pudding lack fields
+	                        * With this option, even text files has lines
+	                          with different number of columns are accepted.
+	                        * "*" will be set as default when <string> is "".
+	Version : 2017-08-28 00:25:54 JST
+	          Open usp Tukubai (POSIX Bourne Shell/POSIX commands)
+	USAGE
+  exit 1
+}
+error_exit() {
+  ${2+:} false && echo "${0##*/}: $2" 1>&2
+  exit $1
+}
+
+
+######################################################################
+# Parse Arguments
+######################################################################
+
+# === Get the options and the filepath ===============================
+# --- initialize option parameters -----------------------------------
 dummy_fldstr=''
 file=''
-
-# parse the arguments
+#
+# --- get them -------------------------------------------------------
 [ $# -gt 0 ] && {
   case "$1" in
     -d*) dummy_fldstr=${1#-d}
@@ -32,22 +79,25 @@ file=''
   esac
 }
 case $# in
-  0) file='-'                                                   ;;
-  1) [ \( -f "$1" \) -o \( -c "$1" \) -o \( -p "$1" \) -o \
-       \( "_$1" = '_-' \)                                 ] && {
+  0) file='-'                                                            ;;
+  1) ([ -f "$1" ] || [ -c "$1" ] || [ -p "$1" ] || [ "_$1" = '_-' ]) && {
        file="$1"
-     }                                                          ;;
-  *) print_usage_and_exit                                       ;;
+     }                                                                   ;;
+  *) print_usage_and_exit                                                ;;
 esac
-if [ \( ! -r "$file" \) -a \( "_$file" != '_-' \) ]; then
-  printf '%s: Cannot open the file\n' "${0##*/}" 1>&2
-  exit 1
-fi
+[ -r "$file" ] || [ "_$file" = '_-' ] || error_exit 1 'Cannot open the file'
 case "$file" in ''|-|/*|./*|../*) :;; *) file="./$file";; esac
 
-# transpose the table
+
+######################################################################
+# Main Routine
+######################################################################
+
+# === Prepare ========================================================
 export v0=${0##*/}
 export v1=$dummy_fldstr
+
+# === Transpose the textfile =========================================
 exec awk '
 BEGIN {
   max_nf = 0;
