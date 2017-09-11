@@ -11,7 +11,7 @@
 #        -v .... Just lists the names which are contained in the MIME data
 #
 # Designed originally by Nobuaki Tounaka
-# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-07-18
+# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-09-12
 #
 # This is a public-domain software (CC0). It means that all of the
 # people can use this for any purposes with no restrictions at all.
@@ -39,7 +39,7 @@ print_usage_and_exit () {
 	Usage   : ${0##*/} [-v] <name> <MIME-file>
 	Args    : <MIME-file> .. MIME data file
 	Options : -v .... Just lists the names which are contained in the MIME data
-	Version : 2017-07-18 02:39:39 JST
+	Version : 2017-09-12 05:12:07 JST
 	          Open usp Tukubai (POSIX Bourne Shell/POSIX commands)
 	            * Although GNU AWK produces better performance than the
 	              other AWKs
@@ -207,14 +207,9 @@ mktempf0() {
 }
 # --- FUNC : make_temp_file ------------------------------------------
 make_temp_file () {
-  tmpfile=$(mktempf0)
-  if [ $? -eq 0 ]; then
-    tmpfiles="$tmpfiles $tmpfile"
-    trap 'exit_trap' EXIT HUP INT QUIT PIPE ALRM TERM
-  else
-    printf '%s: Cannot create a temporary file\n' "${0##*/}" 1>&2
-    exit 1
-  fi
+  trap 'exit_trap' EXIT HUP INT QUIT PIPE ALRM TERM
+  tmpfile=$(mktempf0) || error_exit 1 'Cannot create a temporary file'
+  tmpfiles="$tmpfiles $tmpfile"
 }
 
 # === Define which AWK command and its function are used =============

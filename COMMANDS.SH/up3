@@ -1,47 +1,209 @@
-#! /bin/sh
+#!/bin/sh
 
-# designed by Nobuaki Tounaka
-# written by 321516
+######################################################################
+#
+# UP3 - Merge A Transaction Data Into A Master One While Keeping The
+#       Order Of The Key Fields
+#
+# USAGE: up3 key=<key> <master> <tran>
+#
+#        key ..... Keyfield number(s) by <key> which must be kept the
+#                  Order even after merging
+#                  * You can also use "@" and "/" characters to mean
+#                    multiplicate keys.
+#                    - "2@4@5" means "2nd, 4th and 5th fields should
+#                      be refferred as the keys"
+#                    - "2/5" means "Fields from 2nd to 5th should be
+#                      refferred as the keys"
+#                  * You can also use "N" or "n" character after a
+#                    key number to mean numeric order mode.
+#                    - "n" means ascending numeric order mode
+#                    - "N" means descending numeric order mode
+#                    - If you want to use them with "/", it must be
+#                      used the same character before and after "/".
+#                      For instance, "2n/5n" is correct, but "2n/5N"
+#                      and "2n/5" are wrong.
+#        <master>  Text file which is a masterdata
+#        <tran> .. Text file which is a transaction data
+#
+# Designed originally by Nobuaki Tounaka
+# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-09-12
+#
+# This is a public-domain software (CC0). It means that all of the
+# people can use this for any purposes with no restrictions at all.
+# By the way, we are fed up with the side effects which are brought
+# about by the major licenses.
+#
+######################################################################
 
-# print the usage and exit
+
+######################################################################
+# Initial Configuration
+######################################################################
+
+# === Initialize shell environment ===================================
+set -u
+umask 0022
+export LC_ALL=C
+type command >/dev/null 2>&1 && type getconf >/dev/null 2>&1 &&
+export PATH="$(command -p getconf PATH)${PATH+:}${PATH-}"
+export UNIX_STD=2003  # to make HP-UX conform to POSIX
+
+# === Define the functions for printing usage and error message ======
 print_usage_and_exit () {
-  cat <<-__USAGE 1>&2
+  cat <<-USAGE 1>&2
 	Usage   : ${0##*/} key=<key> <master> <tran>
-	Version : Mon Oct 19 12:58:39 JST 2015
-	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands/UTF-8)
-__USAGE
+	Args    : <master>  Text file which is a masterdata
+	          <tran> .. Text file which is a transaction data
+	Options : key ..... Keyfield number(s) by <key> which must be kept the
+	                    Order even after merging
+	                    * You can also use "@" and "/" characters to mean
+	                      multiplicate keys.
+	                      - "2@4@5" means "2nd, 4th and 5th fields should
+	                        be refferred as the keys"
+	                      - "2/5" means "Fields from 2nd to 5th should be
+	                        refferred as the keys"
+	                    * You can also use "N" or "n" character after a
+	                      key number to mean numeric order mode.
+	                      - "n" means ascending numeric order mode
+	                      - "N" means descending numeric order mode
+	                      - If you want to use them with "/", it must be
+	                        used the same character before and after "/".
+	                        For instance, "2n/5n" is correct, but "2n/5N"
+	                        and "2n/5" are wrong.
+	Version : 2017-09-12 04:21:09 JST
+	          Open usp Tukubai (POSIX Bourne Shell/POSIX commands/UTF-8)
+	            * Although "-s" (stable sort) supported sort command produces
+	              better performance than non-supported one
+	USAGE
   exit 1
 }
-# decide whether to use the alternative length of AWK or not
-if awk 'BEGIN{a[1]=1;b=length(a)}' 2>/dev/null; then
-  arlen='length'
-else
-  arlen='arlen'
-fi
+error_exit() {
+  ${2+:} false && echo "${0##*/}: $2" 1>&2
+  exit $1
+}
+
+# === Define an exit trap function for delete temporary dirs =========
+exit_trap() {
+  trap '-' EXIT HUP INT QUIT PIPE ALRM TERM
+  [ -d "${Tmp:-}" ] && rm -rf "${Tmp%/*}/_${Tmp##*/_}"
+  exit ${1:-0}
+}
+
+# === Define the function for the alternative of the "mktemp -d -t" ==
+# the alternative of the "mktemp -d -t"
+mktempd0() {
+  # --- parameters, etc. ---------------------------------------------
+  num_of_digits=16  # Length of Random String
+  n=10              # Max Times of Retrying
+  chrs='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_'
+                    # Available letters
+  LF=$(printf '\\\n_');LF=${LF%_}
+  # --- call built-in mktemp if exists -------------------------------
+  type mktemp >/dev/null 2>&1 && {
+    mktemp -d -t _${0##*/}.$$.XXXXXXXXXXXXXXXX
+    return $?
+  }
+  # --- set the temporary directory ----------------------------------
+  Dir_tmp=$(set | grep -q ^TMPDIR= | sed 's/^[^=]\{1,\}=//');
+  case "$Dir_tmp" in
+    '') Dir_tmp='/tmp'      ;;
+    /)  Dir_tmp=''          ;;
+    *)  Dir_tmp=${Dir_tmp%/};;
+  esac
+  # --- mktemp loop --------------------------------------------------
+  while [ $n -ge 0 ]; do
+    # --- Generate Ramdom string -------------------------------------
+    # calculate the number of words which required
+    nw=$(echo "${num_of_digits}*l(${#chrs})/11.09+1" | # 11.09=ln(65536)
+         bc -l                                       |
+         sed 's/\..*$//'                             )
+    # make a random hexadecimal digit
+    if [ -c /dev/urandom ]; then
+      hstr=$(dd if=/dev/urandom bs=2 count=$nw 2>/dev/null |
+             od -A n -t x2 -v                              |
+             tr 'abcdef ' 'ABCDEF\n'                       |
+             tr -Cd 0123456789ABCDEF                       )
+    else
+      hstr=$( (ps -Ao pid,etime,pcpu,vsz; date)         |
+             od -t d4 -A n -v                           |
+             sed 's/[^0-9]\{1,\}/'"$LF"'/g'             |
+             grep '[0-9]'                               |
+             tail -n 42                                 |
+             sed 's/.*\(.\{8\}\)$/\1/g'                 |
+             awk 'BEGIN{a=-2147483648;}                 #
+                       {a+=$1;        }                 #
+                  END  {                                #
+                    srand(a);                           #
+                    for(i=0;i<'$nw';i++){               #
+                      printf("%02X",int(rand()*65536)); #
+                    }                                   #
+                  }'                                    )
+    fi
+    # make a random string from the hexadecimal digit
+    s=$(echo "obase=${#chrs};ibase=16;$hstr"                     |
+        bc                                                       |
+        tr -d '\\\n'                                             |
+        tr ' ' '\n'                                              |
+        awk 'BEGIN  {for(i=1;i<'$num_of_digits';i++){print 0;}}  #
+             /[0-9]/{print;                                   }' |
+        awk 'BEGIN  {ORS="";                                     #
+                     s="'"$chrs"'";                              #
+                     for(i=0;i<length(s);i++){                   #
+                       c[i]=substr(s,i+1,1);                     #
+                     }                        }                  #
+             /[0-9]/{print c[$0*1];           }'                 |
+        tail -c $num_of_digits                                   )
+    # --- Making the file path ---------------------------------------
+    Path_target="${Dir_tmp}/tmp.${0##*/}.$$.$s"
+    # --- Making the file --------------------------------------------
+    (set -C; umask 177; : > "$Path_target") 2>/dev/null || {
+      [ -f "$Path_target" ] && { n=$((n-1)); continue; }
+      n=-1; break;
+    }
+    break
+  done
+  # --- print error message when failed to make a file ---------------
+  case "$n" in -1) return 1;; esac
+  # --- print the path of the file -----------------------------------
+  printf '%s\n' "$Path_target"
+  # --- return successfully ------------------------------------------
+  return 0
+}
+
+# === Investigate whether sort command supports "-s" option or not ===
+stablesort=0;
+for CMD_SORT in sort gsort; do
+  type $CMD_SORT >/dev/null 2>&1 && {
+    case "$(printf '1 B\n1 A\n'             |
+            "$CMD_SORT" -sk 1,1 2>/dev/null |
+            head -n 1                       )" in
+      '1 B') stablesort=1; break;;
+    esac
+  }
+done
+export stablesort
 
 
-# initialize
-PATH='/usr/bin:/bin'
-IFS=$(printf ' \t\n_'); IFS=${IFS%_}
-export IFS LANG=C LC_ALL=C
-LF=$(printf '\\\n_');LF=${LF%_}
-set -u
+######################################################################
+# Parse Arguments
+######################################################################
 
+# === Get the options and the filepaths ==============================
+# --- initialize option parameters -----------------------------------
 key=''
 fldstr=''
 masterfile=''
 tranfile=''
-
-
-# validate the arguments
-case $# in [01]) print_usage_and_exit;; esac
+#
+# --- get them -------------------------------------------------------
+case $# in [23]) :;; *) print_usage_and_exit;; esac
 for arg in "$@"; do
   case "$arg" in
     key=*)
       key=${arg#key=}
       case "$key" in *NF*)
-        printf '%s\n' "${0##*/}: Cannot use NF in the key argument" 1>&2
-        exit 1
+        error_exit 1 'Cannot use NF in the key argument'
         ;;
       esac
       ;;
@@ -65,257 +227,93 @@ done
 case "$key"        in '') print_usage_and_exit;; esac
 case "$masterfile" in '') print_usage_and_exit;; esac
 case "$tranfile"   in '') tranfile='-'        ;; esac
+
+# === Validate the masterfile and transaction file ===================
 use_stdin=0
 for file in "$masterfile" "$tranfile"; do
-  if [ \( "_$file" = '_-'               \) -o \
-       \( "_$file" = '_/dev/stdin'      \) -o \
-       \( "_$file" = '_/dev/fd/0'       \) -o \
-       \( "_$file" = '_/proc/self/fd/0' \)    ]
-  then
-    use_stdin=$((use_stdin+1))
-  fi
+  case "$file" in
+     -|/dev/stdin|/dev/fd/0|/proc/self/fd/0) use_stdin=$((use_stdin+1));;
+  esac
 done
-if [ $use_stdin -gt 1 ]; then
-  print_usage_and_exit
-fi
-if [ \( ! -r "$masterfile" \) -a \( "_$masterfile" != '_-' \) ]; then
-  printf '%s\n' "${0##*/}: Cannot open the master file" 1>&2
-  exit 1
-fi
-if [ \( ! -r "$tranfile" \) -a \( "_$tranfile" != '_-' \) ]; then
-  printf '%s\n' "${0##*/}: Cannot open the transaction file" 1>&2
-  exit 1
-fi
+case $use_stdin in [01]) :;; *) error_exit 1 'You cannot use STDIN twice';; esac
+[ -r "$masterfile" ] || [ "_$masterfile" = '_-' ] || {
+  error_exit 1 'Cannot open the master file'
+}
+[ -r "$tranfile"   ] || [ "_$tranfile"   = '_-' ] || {
+  error_exit 1 'Cannot open the transaction file'
+}
 case "$masterfile" in ''|-|/*|./*|../*) :;; *) masterfile="./$masterfile";; esac
 case "$tranfile"   in ''|-|/*|./*|../*) :;; *)   tranfile="./$tranfile"  ;; esac
 
-# validate the "key" argument and make the fields to compare from it
-dlm='"\001" '
-for arg in $(printf '%s\n' "$key" | tr '@' ' '); do
-  # "/" extraction mode (make arg2 if this mode)
-  arg1=${arg%%/*}
-  arg2=${arg##*/}
-  if [ \( "_${arg1}/${arg2}" = "_$arg"   \) -a \
-       \( -n "$arg1" \) -a \( -n "$arg2" \)    ]
-  then
-    :
-  else
-    arg2=''
-  fi
-  # get substr parameters from arg1 if possible
-  stpos=0
-  edpos=-1
-  arg1s=${arg1#*.}
-  arg1=${arg1%%.*}
-  if [ "_$arg1s" != "_$arg1" ]; then
-    if printf '%s\n' "$arg1s" | grep -q '^[0-9]\{1,\}$'; then
-      stpos=$arg1s
-      if [ $stpos -eq 0 ]; then
-        break
-      fi
-    elif printf '%s\n' "$arg1s" | grep -q '^[0-9]\{1,\}\.[0-9]\{1,\}$'; then
-      stpos=${arg1s%.*}
-      edpos=${arg1s#*.}
-      if [ $stpos -eq 0 ]; then
-        break
-      fi
-    else
-      break
-    fi
-  fi
-  # judge the field number type of arg1 (also arg2 if possible)
-  if printf '%s\n' "$arg1" | grep -q '^[0-9]\{1,\}$'; then
-    arg1type=1
-  else
-    arg1type=-1
-  fi
-  if [ -z "$arg2" ]; then
-    arg2type=0
-  elif printf '%s\n' "$arg2" | grep -q '^[0-9]\{1,\}$'; then
-    arg2type=1
-  else
-    arg2type=-1
-  fi
-  if [ \( $arg1type -lt 0 \) -o \( $arg2type -lt 0 \) ]; then
-    break
-  fi
-  # generate the string for the AWK-print
-  if [ $arg2type -eq 0 ]; then
-    if [ $stpos -eq 0 ]; then
-      if [ $arg1type -eq 1 ]; then
-        fldstr="$fldstr$dlm\$$arg1"
-      else
-        fldstr="$fldstr$dlm\$($arg1)"
-      fi
-    else
-      if [ $arg1type -eq 1 ]; then
-        fldstr="$fldstr${dlm}getsubf(\$$arg1,$stpos,$edpos)"
-      else
-        fldstr="$fldstr${dlm}getsubf(\$($arg1),$stpos,$edpos)"
-      fi
-    fi
-  else
-    if [ \( $stpos -eq 0 \) -a \( $arg1 -le $arg2 \) ]; then
-      j=$arg1
-      while [ $j -le $arg2 ]; do
-        fldstr="$fldstr${dlm}\$$j"
-        dlm=' "\001" '
-        j=$((j+1))
-      done
-    elif [ \( $stpos -eq 0 \) -a \( $arg1 -ge $arg2 \) ]; then
-      j=$arg1
-      while [ $j -ge $arg2 ]; do
-        fldstr="$fldstr${dlm}\$$j"
-        dlm=' "\001" '
-        j=$((j-1))
-      done
-    elif [ \( $stpos -ne 0 \) -a \( $arg1 -le $arg2 \) ]; then
-      j=$arg1
-      while [ $j -le $arg2 ]; do
-        fldstr="$fldstr${dlm}getsubf(\$$j,$stpos,$edpos)"
-        dlm=' "\001" '
-        j=$((j+1))
-      done
-    elif [ \( $stpos -ne 0 \) -a \( $arg1 -ge $arg2 \) ]; then
-      j=$arg1
-      while [ $j -ge $arg2 ]; do
-        fldstr="$fldstr${dlm}getsubf(\$$j,$stpos,$edpos)"
-        dlm=' "\001" '
-        j=$((j-1))
-      done
-    fi
-  fi
-  # loop
-  arg=''
-  dlm=' "\001" '
-done
-case "$fldstr" in '') print_usage_and_exit;; esac
+# === Validate the "key" argument and make the fields ================
+fldstr=$(printf '%s\n' "$key"                                         |
+         tr '@' '\n'                                                  |
+         awk 'BEGIN{n_shift=(ENVIRON["stablesort"]==0)?1:0;}          #
+              /^[0-9]+$/{                                             #
+                printf("-k %d,%d ",$0+n_shift,$0+n_shift);            #
+                next;                                                 #
+              }                                                       #
+              /^[0-9]+[Nn]$/{                                         #
+                l=length($0);                                         #
+                n=substr($0,1,l-1)+n_shift;                           #
+                o=substr($0,l    )  ;                                 #
+                if(o=="N"){o="nr";}                                   #
+                printf("-k %d%s,%d%s ",n,o,n,o);                      #
+                next;                                                 #
+              }                                                       #
+              /^[0-9]+\/[0-9]+$/{                                     #
+                p =index( $0,"/");                                    #
+                l =length($0    );                                    #
+                n1=substr($0,  1,  p-1)+n_shift;                      #
+                n2=substr($0,p+1      )+n_shift;                      #
+                if(n1<=n2){printf("-k %d,%d ",n1,n2);next;}           #
+                for(i=n1;i>=n2;i--){printf("-k %d,%d ",i,i);}         #
+                next;                                                 #
+              }                                                       #
+              /^[0-9]+[Nn]\/[0-9]+[Nn]$/{                             #
+                p =index( $0,"/");                                    #
+                l =length($0    );                                    #
+                o1=substr($0,p-1,1);                                  #
+                o2=substr($0,  l  );                                  #
+                if(o1!=o2 ){print "_"; exit;}                         #
+                if(o1=="N"){o="nr";}                                  #
+                n1=substr($0,  1,  p-2)+n_shift;                      #
+                n2=substr($0,p+1,l-p-1)+n_shift;                      #
+                if(n1<=n2){printf("-k %d%s,%d%s ",n1,o,n2,o);next;}   #
+                for(i=n1;i>=n2;i--){printf("-k %d%s,%d%s ",i,o,i,o);} #
+                next;                                                 #
+              }                                                       #
+              {print "_"; exit;}'                                     )
+case "$fldstr" in *_*) error_exit 1 'Invalid key option';; esac
 
 
-# up3
-export masterfile tranfile
-exec awk \
-'
-  # the alternative length function for array variable
-  function arlen(ar,i,l){for(i in ar){l++;}return l;}
-  # strlen for UTF-8 (main)
-  function utf8strlen(str, len,i,l1,l2,l3) {
-    len = 0;
-    for (i = 1; i <= length(str); i++) {
-      len++;
-      l1=substr(str, i, 1);
-      if        (l1 < "\200") {       continue;
-      } else if (l1 < "\300") {len--; continue;
-      } else if (l1 < "\340") {i++;
-      } else if (l1 < "\360") {
-        if (l1 == "\357") {
-          l2 = substr(str, i+1, 1);
-          if (l2 == "\275") {
-            l3 = substr(str, i+2, 1);
-            if ((l3 >= "\240") && (l3 < "\300")) {len--;}
-          } else if (l2 == "\276") {
-            l3 = substr(str, i+2, 1);
-            if ((l3 >= "\200") && (l3 < "\240")) {len--;}
-          }
-        }
-        i += 2;
-      } else if (l1 < "\370") {i += 3;
-      } else if (l1 < "\374") {i += 4;
-      } else if (l1 < "\376") {i += 5;
-      } else                  {len-- ; continue;}
-      len++;
-    }
-    return len;
-  }
-  # return the substr in accordance with the counting rule of self command
-  function getsubf(str, startpos, len  ,i,p,l,l2,l3,st,ed) {
-    # - "st" is a byte offset (start from 1) which the
-    #   "startpos" suggests by the Japanese text position (zenkaku-hankaku;
-    #   start from 1)
-    # - "ed" is a byte offset + 1 (start from 1) which the
-    #   "len" suggests by the Japanese text width (zenkaku-hankaku;
-    #   start from 1; -1 means "to the end")
-    st = 0;
-    ed = 0;
-    #
-    # - "i" is a byte offset (start from 1) from which the function
-    #   will read now
-    # - "l" is a Japanese text position (zenkaku-hankaku; start
-    #   from 1) of the letter which the function will read
-    i = 1;
-    p = 1;
-    while (i <= length(str)) {
-      if (st == 0) {
-        if (startpos == p) {
-          st = i;
-          if (len == -1) {break;}
-        } else if (startpos < p) {
-          _assert_exit = 1;
-          exit _assert_exit;
-        }
-      }
-      l = substr(str, i, 1);
-      if        (l < "\200") {i++; p++;
-      } else if (l < "\300") {i++; # invalid UTF-8
-      } else if (l < "\340") {i += 2; p += 2;
-      } else if (l < "\360") {
-        if (l == "\357") {
-          l2 = substr(str, i+1, 1);
-          if        (l2 == "\275") {
-            l3 = substr(str, i+2, 1);
-            if ((l3 >= "\240") && (l3 < "\300")) {p += 1;
-            } else                               {p += 2;}
-          } else if (l2 == "\276") {
-            l3 = substr(str, i+2, 1);
-            if ((l3 >= "\200") && (l3 < "\240")) {p += 1;
-            } else                               {p += 2;}
-          } else                   {p += 2;               }
-        } else           {p += 2;                          }
-        i += 3;
-      } else if (l < "\370") {i += 4; p += 2;
-      } else if (l < "\374") {i += 5; p += 2;
-      } else if (l < "\376") {i += 6; p += 2;
-      } else                 {i++;                          } # invalidUTF-8
-      if (st > 0) {
-        if        ((startpos + len) == p) {ed = i ; break;
-        } else if (len == 0)              {ed = st; break;
-        } else if ((startpos + len) <  p) {_assert_exit = 1; exit _assert_exit;}
-      }
-    }
-    if (st == 0) {_assert_exit = 1; exit _assert_exit;}
-    return (ed == 0) ? substr(str,st) : substr(str,st,ed-st);
-  }
+######################################################################
+# Main
+######################################################################
 
-  # ==================================================================
+# === (a) If "sort -s" is possible, do "up3" with it =================
+case $stablesort in 0) :;; *)
+  exec $CMD_SORT -bms $fldstr "$masterfile" "$tranfile"
+  exit
+;; esac
 
-  # do "up3"
-  BEGIN {
-    mfile = ENVIRON["masterfile"]; mline = ""; m_key = ""; m_eof = 0;
-    tfile = ENVIRON["tranfile"  ]; tline = ""; t_key = ""; t_eof = 0;
+# === (b) If "/dev/fd/3" exists, do "up3" through it =================
+([ -c /dev/fd/3 ] && [ -r /dev/fd/3 ]) 3<&0 && {
+  ( (cat "$masterfile" | sed 's/^/1 /')   |        #
+    ( (cat "$tranfile" | sed 's/^/2 /')   |        #
+      sort -bm-k 1,1  $fldstr /dev/fd/3 - ) 3<&0 ) |
+  sed 's/^..//'
+  exit
+}
 
-    if (getline < mfile) {mline = $0; m_key = '"$fldstr"';} else {m_eof=1;}
-    if (getline < tfile) {tline = $0; t_key = '"$fldstr"';} else {t_eof=1;}
-
-    while ((m_eof+t_eof) == 0) {
-      if (t_key < m_key) {
-        print tline;
-        if (!(getline < tfile)) {t_eof=1; break;}
-        tline = $0;
-        t_key = '"$fldstr"';
-      } else             {
-        print mline;
-        if (!(getline < mfile)) {m_eof=1; break;}
-        mline = $0;
-        m_key = '"$fldstr"';
-      }
-    }
-
-    if        (! m_eof) {
-      print mline;
-      while (getline mline < mfile) {print mline;}
-    } else if (! t_eof) {
-      print tline;
-      while (getline tline < tfile) {print tline;}
-    }
-  }
-'
+# === (c) Otherwise, do "up3" with a named pipe ======================
+trap 'exit_trap' EXIT HUP INT QUIT PIPE ALRM TERM
+Tmp=`mktempd0`  || error_exit 1 'Failed to mktemp'
+mkfifo "$Tmp/p" || error_exit 1 'Failed to mkfifo'
+cat "$masterfile" |
+sed 's/^/1 /'     > "$Tmp/p" &
+cat "$tranfile"                    |
+sed 's/^/2 /'                      |
+sort -bm -k 1,1 $fldstr "$Tmp/p" - |
+sed 's/^..//'
+exit_trap

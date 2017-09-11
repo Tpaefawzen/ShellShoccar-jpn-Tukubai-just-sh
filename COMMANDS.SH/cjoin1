@@ -7,7 +7,7 @@
 #
 # USAGE: cjoin1 [+ng[<fd>]] key=<key> <master> <tran>
 #
-#        key ..... Keyfiled number(s) by <key> for join operation in the
+#        key ..... Keyfield number(s) by <key> for join operation in the
 #                  transaction data
 #                  * You can also use "@" and "/" characters to mean
 #                    multiplicate keys.
