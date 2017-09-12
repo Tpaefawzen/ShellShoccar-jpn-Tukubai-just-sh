@@ -27,7 +27,7 @@
 #                  filedescriptor <fd>. (<fd>'s default is 2)
 #
 # Designed originally by Nobuaki Tounaka
-# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-08-27
+# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-09-12
 #
 # This is a public-domain software (CC0). It means that all of the
 # people can use this for any purposes with no restrictions at all.
@@ -71,7 +71,7 @@ print_usage_and_exit () {
 	                        referred in the masterdata.
 	          +ng ..... Output the lines which can't be joined to
 	                    filedescriptor <fd>. (<fd>'s default is 2)
-	Version : 2017-08-27 02:54:02 JST
+	Version : 2017-09-12 23:39:46 JST
 	          Open usp Tukubai (POSIX Bourne Shell/POSIX commands/UTF-8)
 	USAGE
   exit 1
@@ -270,6 +270,8 @@ fldstr_m=$(echo "$fldstr_t"                                         |
 ######################################################################
 
 case "$ng" in '') ifng='#';; *) ifng='';; esac
+export masterfile
+export tranfile
 exec awk '
   # return the substr in accordance with the counting rule of self command
   function getsubf(str, startpos, len  ,i,p,l,l2,l3,st,ed) {
@@ -332,39 +334,40 @@ exec awk '
 
   # ==================================================================
 
-  # prepare
   BEGIN {
+    # prepare
+    mstfile=ENVIRON["masterfile"];
+    trnfile=ENVIRON["tranfile"  ];
     minfldnum = '$minfldnum';
     maxfldnum = '$maxfldnum';
     split("'"$flds_t"'", ar);
     for (s in ar) {flds_t[ar[s]]=1;}
-  }
 
-  # print the records in tran which have the same key
-  FNR < NR {
-    key_str = '"$fldstr_t"';
-    if (key_str in masterkey) {
-      rec_str = "";
-      for (i=1; i <=maxfldnum; i++) {
-        rec_str = rec_str FS $i;
+    # load the keys in master
+    while (getline < mstfile) {
+      iflds = ""; # fields which will be inserted between the transaction fields
+      for (i=maxfldnum-minfldnum+2; i<=NF; i++) {
+        iflds = iflds FS $i;
       }
-      rec_str = rec_str masterkey[key_str];
-      for (i=maxfldnum+1; i<=NF; i++) {
-        if (! (i in flds_t)) {rec_str = rec_str FS $i;}
-      }
-      print substr(rec_str,2);
-    '"$ifng"'} else {
-    '"$ifng"'  print > "'"$ng"'";
+      masterkey['"$fldstr_m"'] = iflds;
     }
-    next;
-  }
 
-  # load the keys in master
-  {
-    iflds = ""; # fields which will be inserted between the transaction fields
-    for (i=maxfldnum-minfldnum+2; i<=NF; i++) {
-      iflds = iflds FS $i;
+    # print the records in tran which have the same key
+    while (getline < trnfile) {
+      key_str = '"$fldstr_t"';
+      if (key_str in masterkey) {
+        rec_str = "";
+        for (i=1; i <=maxfldnum; i++) {
+          rec_str = rec_str FS $i;
+        }
+        rec_str = rec_str masterkey[key_str];
+        for (i=maxfldnum+1; i<=NF; i++) {
+          if (! (i in flds_t)) {rec_str = rec_str FS $i;}
+        }
+        print substr(rec_str,2);
+      '"$ifng"'} else {
+      '"$ifng"'  print > "'"$ng"'";
+      }
     }
-    masterkey['"$fldstr_m"'] = iflds;
   }
-' "$masterfile" "$tranfile"
+'

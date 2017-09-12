@@ -27,7 +27,7 @@
 #                  filedescriptor <fd>. (<fd>'s default is 2)
 #
 # Designed originally by Nobuaki Tounaka
-# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-08-27
+# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-09-12
 #
 # This is a public-domain software (CC0). It means that all of the
 # people can use this for any purposes with no restrictions at all.
@@ -71,7 +71,7 @@ print_usage_and_exit () {
 	                        referred in the masterdata.
 	          +ng ..... Output the lines which can't be joined to
 	                    filedescriptor <fd>. (<fd>'s default is 2)
-	Version : 2017-08-27 02:54:02 JST
+	Version : 2017-09-12 23:28:21 JST
 	          Open usp Tukubai (POSIX Bourne Shell/POSIX commands/UTF-8)
 	USAGE
   exit 1
@@ -268,7 +268,9 @@ fldstr_m=$(echo "$fldstr_t"                                           |
 ######################################################################
 
 case "$ng" in '') ifng='#';; *) ifng='';; esac
-exec awk -v ng=$ng '
+export masterfile
+export tranfile
+exec awk '
   # return the substr in accordance with the counting rule of self command
   function getsubf(str, startpos, len  ,i,p,l,l2,l3,st,ed) {
     # - "st" is a byte offset (start from 1) which the
@@ -330,19 +332,24 @@ exec awk -v ng=$ng '
 
   # ==================================================================
 
-  # print the records in tran which have the same key
-  FNR < NR {
-    key_str = '"$fldstr_t"';
-    if   (key_str in masterkey) {
-      print;
-    '"$ifng"'} else {
-    '"$ifng"'  print > "'"$ng"'";
-    }
-    next;
-  }
+  BEGIN {
+    # prepare
+    mstfile=ENVIRON["masterfile"];
+    trnfile=ENVIRON["tranfile"  ];
 
-  # load the keys in master
-  {
-    masterkey['"$fldstr_m"'] = 1;
+    # load the keys in master
+    while (getline < mstfile) {
+      masterkey['"$fldstr_m"'] = 1;
+    }
+
+    # print the records in tran which have the same key
+    while (getline < trnfile) {
+      key_str = '"$fldstr_t"';
+      if   (key_str in masterkey) {
+        print;
+      '"$ifng"'} else {
+      '"$ifng"'  print > "'"$ng"'";
+      }
+    }
   }
-' "$masterfile" "$tranfile"
+'

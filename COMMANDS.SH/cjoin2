@@ -28,7 +28,7 @@
 #                  (<string>'s default is "*")
 #
 # Designed originally by Nobuaki Tounaka
-# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-08-27
+# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-09-12
 #
 # This is a public-domain software (CC0). It means that all of the
 # people can use this for any purposes with no restrictions at all.
@@ -73,7 +73,7 @@ print_usage_and_exit () {
 	          -d,+ .... Substitute string by <string>, it will be used for
 	                    lines in the transaction data which can't be joined.
 	                    (<string>'s default is "*")
-	Version : 2017-08-27 02:54:02 JST
+	Version : 2017-09-12 23:40:27 JST
 	          Open usp Tukubai (POSIX Bourne Shell/POSIX commands/UTF-8)
 	USAGE
   exit 1
@@ -268,6 +268,8 @@ fldstr_m=$(echo "$fldstr_t"                                         |
 ######################################################################
 
 export dummy
+export masterfile
+export tranfile
 exec awk '
   # strlen for UTF-8 (main)
   function utf8strlen(str, len,i,l1,l2,l3) {
@@ -359,8 +361,10 @@ exec awk '
 
   # ==================================================================
 
-  # prepare
   BEGIN {
+    # prepare
+    mstfile=ENVIRON["masterfile"];
+    trnfile=ENVIRON["tranfile"  ];
     minfldnum = '$minfldnum';
     maxfldnum = '$maxfldnum';
     split("'"$flds_t"'", ar);
@@ -368,51 +372,50 @@ exec awk '
     fldlenlen = 0;
     dummy = ENVIRON["dummy"];
     dummy_mstrec = "";
-  }
 
-  # print the records in tran which have the same key
-  FNR < NR {
-    key_str = '"$fldstr_t"';
-    rec_str = "";
-    for (i=1; i<=maxfldnum; i++) {
-      rec_str = rec_str FS $i;
-    }
-    if (key_str in masterkey) {
-      rec_str = rec_str masterkey[key_str];
-    } else                    {
-      rec_str = rec_str dummy_mstrec;
-    }
-    for (i=maxfldnum+1; i<=NF; i++) {
-      if (! (i in flds_t)) {rec_str = rec_str FS $i;}
-    }
-    print substr(rec_str,2);
-    next;
-  }
-
-  # load the keys in master
-  {
-    split("",maxflen); # max length  of field[n] of all records
-    iflds = ""; # fields which will be inserted between the transaction fields
-    for (i=maxfldnum-minfldnum+2; i<=NF; i++) {
-      iflds = iflds FS $i;
-      if (dummy == "") {
-        flen = utf8strlen($i);
-        if ((!(i in maxflen)) || (flen > maxflen[i])) {
-          maxflen[i] = flen;
+    # load the keys in master
+    while (getline < mstfile) {
+      split("",maxflen); # max length  of field[n] of all records
+      iflds = ""; # fields which will be inserted between the transaction fields
+      for (i=maxfldnum-minfldnum+2; i<=NF; i++) {
+        iflds = iflds FS $i;
+        if (dummy == "") {
+          flen = utf8strlen($i);
+          if ((!(i in maxflen)) || (flen > maxflen[i])) {
+            maxflen[i] = flen;
+          }
         }
       }
-    }
-    masterkey['"$fldstr_m"'] = iflds;
-    #
-    dummy_mstrec = "";
-    for (i=maxfldnum-minfldnum+2; i<=NF; i++) {
-      if (dummy != "") {
-        s = dummy
-      } else           {
-        s = sprintf("%0" maxflen[i] "d",0);
-        gsub(/0/, "*", s);
+      masterkey['"$fldstr_m"'] = iflds;
+      #
+      dummy_mstrec = "";
+      for (i=maxfldnum-minfldnum+2; i<=NF; i++) {
+        if (dummy != "") {
+          s = dummy
+        } else           {
+          s = sprintf("%0" maxflen[i] "d",0);
+          gsub(/0/, "*", s);
+        }
+        dummy_mstrec = dummy_mstrec FS s;
       }
-      dummy_mstrec = dummy_mstrec FS s;
+    }
+
+    # print the records in tran which have the same key
+    while (getline < trnfile) {
+      key_str = '"$fldstr_t"';
+      rec_str = "";
+      for (i=1; i<=maxfldnum; i++) {
+        rec_str = rec_str FS $i;
+      }
+      if (key_str in masterkey) {
+        rec_str = rec_str masterkey[key_str];
+      } else                    {
+        rec_str = rec_str dummy_mstrec;
+      }
+      for (i=maxfldnum+1; i<=NF; i++) {
+        if (! (i in flds_t)) {rec_str = rec_str FS $i;}
+      }
+      print substr(rec_str,2);
     }
   }
-' "$masterfile" "$tranfile"
+'
