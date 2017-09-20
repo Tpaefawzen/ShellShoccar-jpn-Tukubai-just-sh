@@ -71,7 +71,7 @@ print_usage_and_exit () {
 	                        referred in the masterdata.
 	          +ng ..... Output the lines which can't be joined to
 	                    filedescriptor <fd>. (<fd>'s default is 2)
-	Version : 2017-09-20 09:36:37 JST
+	Version : 2017-09-20 18:24:48 JST
 	          Open usp Tukubai (POSIX Bourne Shell/POSIX commands/UTF-8)
 	USAGE
   exit 1
@@ -269,9 +269,9 @@ BEGIN {
 }
 
 END {
-  if (err=="") {                                                       exit 0;}
-  else         {printf("%s: %s\n",ENVIRON["cmd"],err) > "/dev/stderr"; exit 1;}
-}' </dev/null
+  if (err=="") {                                                    exit 0;}
+  else         {printf("%s: %s\n",ENVIRON["cmd"],err) | "cat 1>&2"; exit 1;}
+}'
 
 exit;; esac
 
@@ -348,6 +348,6 @@ END {
 function addfngrp_t(fr,to ,i) {
   if (fr<=to) {for (i=fr; i<=to; i++) {fngrp_t[i]="";}}
   else        {for (i=fr; i>=to; i--) {fngrp_t[i]="";}}
-}' </dev/null
+}'
 
 exit
