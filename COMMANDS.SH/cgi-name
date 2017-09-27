@@ -22,7 +22,7 @@
 #                      or "checkbox}" 
 #
 # Designed originally by Nobuaki Tounaka
-# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-07-18
+# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-09-27
 #
 # This is a public-domain software (CC0). It means that all of the
 # people can use this for any purposes with no restrictions at all.
@@ -61,7 +61,7 @@ print_usage_and_exit () {
 	                        in the data from <param_file> even though the same
 	                        variables exist <html> as a <input type="radio">
 	                        or "checkbox}" 
-	Version : 2017-07-18 02:39:39 JST
+	Version : 2017-09-27 17:15:10 JST
 	          Open usp Tukubai (POSIX Bourne Shell/POSIX commands)
 	USAGE
   exit 1
@@ -163,8 +163,9 @@ elif [ -f "$param_file"                    ] ||
 else
   print_usage_and_exit
 fi
-if   [ "_$tmpl_file"  = '_'                ] ||
-     [ "_$tmpl_file"  = '_-'               ] ||
+if   [ "_$tmpl_file"  = '_'                ] ; then
+  :
+elif [ "_$tmpl_file"  = '_-'               ] ||
      [ "_$tmpl_file"  = '_/dev/stdin'      ] ||
      [ "_$tmpl_file"  = '_/dev/fd/0'       ] ||
      [ "_$tmpl_file"  = '_/proc/self/fd/0' ]  ; then
