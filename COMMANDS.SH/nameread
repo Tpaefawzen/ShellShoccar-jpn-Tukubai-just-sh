@@ -16,7 +16,7 @@
 #                      CGI variables is nothing
 #
 # Designed originally by Nobuaki Tounaka
-# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-07-18
+# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-09-27
 #
 # This is a public-domain software (CC0). It means that all of the
 # people can use this for any purposes with no restrictions at all.
@@ -50,7 +50,7 @@ print_usage_and_exit () {
 	                        strings with <c>
 	          -n<string> .. Gives <string> as the value if its value part of
 	                        CGI variables is nothing
-	Version : 2017-07-18 02:39:39 JST
+	Version : 2017-09-27 17:06:04 JST
 	          Open usp Tukubai (POSIX Bourne Shell/POSIX commands)
 	USAGE
   exit 1
@@ -149,7 +149,7 @@ done
 
 # === Validate the arguments =========================================
 case "$name" in '') print_usage_and_exit;; esac
-elif [ "_$name_file" = '_'                ] ||
+if   [ "_$name_file" = '_'                ] ||
      [ "_$name_file" = '_-'               ] ||
      [ "_$name_file" = '_/dev/stdin'      ] ||
      [ "_$name_file" = '_/dev/fd/0'       ] ||
