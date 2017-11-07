@@ -12,6 +12,8 @@
 #                        of strings with <c>
 #        -n<string> .... Treat the strings in <data_file> which are
 #                        completely the same as <string> as null
+#        -d, -i ........ Obsolete names and work equivalently as
+#                        -s, -n respectively
 #
 # Designed originally by Nobuaki Tounaka
 # Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-11-07
@@ -46,7 +48,9 @@ print_usage_and_exit () {
 	                          of strings with <c>
 	          -n<string> .... Treat the strings in <data_file> which are
 	                          completely the same as <string> as null
-	Version : 2017-11-07 20:36:40 JST
+	          -d, -i ........ Obsolete name and work equivalently as
+	                          -s, -n respectively
+	Version : 2017-11-07 20:47:43 JST
 	          Open usp Tukubai (POSIX Bourne Shell/POSIX commands)
 	USAGE
   exit 1
@@ -192,7 +196,7 @@ BEGIN {
       else if ((opts_is_set==1)&&(c==opts)) {    val=val " "               ;}
       else                                  {    val=val c                 ;}
     }
-    name_list[nam]=val; nameval[line]="";
+    name_list[nam]=val; nameval[nam FS val]="";
   }
 
   # === Replacing HTML Form Values ===================================
@@ -279,7 +283,7 @@ BEGIN {
         s_prn=s_prn str0 str;
         break;
       }
-      s=s_val;
+      s=s_val;s_val="";
       while (s!="") {
         i=index(s,"&");
         if(i==0){s_val=s_val s;break;}
