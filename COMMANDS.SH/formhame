@@ -46,7 +46,7 @@ print_usage_and_exit () {
 	                          of strings with <c>
 	          -n<string> .... Treat the strings in <data_file> which are
 	                          completely the same as <string> as null
-	Version : 2017-11-07 03:45:10 JST
+	Version : 2017-11-07 20:36:40 JST
 	          Open usp Tukubai (POSIX Bourne Shell/POSIX commands)
 	USAGE
   exit 1
@@ -201,8 +201,7 @@ BEGIN {
   while (line!="") {
     if        (tag==""        ) {
       # --- out of tag -----------------------------------------------
-      read_until_the_start_of_a_tag();
-      print str0,str;
+      print_until_the_start_of_a_tag();
       tag=tolower(str);
     } else if (tag=="!--"     ) {
       # --- in comment area ------------------------------------------
@@ -227,8 +226,8 @@ BEGIN {
         else if(str2=="=\047") {read_str_in_sq();tag_v[pn]=str2 str "\047";}
         else                   {read_str_in_nq();tag_v[pn]=str2 str       ;}
       }
-      tag_s=input_tag_hame(tag_s,tag_p,tag_v);
-      restore_and_print_the_tag(tag_s,tag_p,tag_v);
+      input_tag_hame();
+      restore_and_print_the_tag();
       tag="";
     } else if (tag=="option"  ) {
       # --- in <option> tag ------------------------------------------
@@ -249,8 +248,8 @@ BEGIN {
       }
       # (a). for <option> tag which has "value" property
       if ("v" in tag_p) {
-        tag_s=option_tag_hame(tag_s,tag_p,tag_v);
-        restore_and_print_the_tag(tag_s,tag_p,tag_v);
+        option_tag_hame();
+        restore_and_print_the_tag();
         tag="";
         continue;
       }
@@ -280,13 +279,24 @@ BEGIN {
         s_prn=s_prn str0 str;
         break;
       }
+      s=s_val;
+      while (s!="") {
+        i=index(s,"&");
+        if(i==0){s_val=s_val s;break;}
+        s_val=s_val substr(s,1,i-1); s=substr(s,i);
+        if (match(s,/^&([A-Za-z0-9]+|#[0-9]+|#x[0-9A-Fa-f]+);/)) {
+          s_val=s_val substr(s,1,RLENGTH); s=substr(s,RLENGTH+1);
+        } else                                                   {
+          s_val=s_val "&amp;"            ; s=substr(s,2        );
+        }
+      }
       gsub(/\042/,"&quot;",s_val);
       gsub(/\047/,"&apos;",s_val);
       tag_p["v"]="value";
       tag_v["v"]="=\"" s_val "\"";
       # 2) print the <option> which has been done "HAME"
-      tag_s=option_tag_hame(tag_s,tag_p,tag_v);
-      restore_and_print_the_tag(tag_s,tag_p,tag_v);
+      option_tag_hame();
+      restore_and_print_the_tag();
       # 3) print the string which follows the <option>
       print s_prn;
       tag=tag2;
@@ -307,7 +317,7 @@ BEGIN {
         else                   {read_str_in_nq();tag_v[pn]=str2 str       ;}
         if     (pn=="n"      ) {selnam=str                                ;}
       }
-      restore_and_print_the_tag(tag_s,tag_p,tag_v);
+      restore_and_print_the_tag();
       tag="";
     } else if (tag=="textarea") {
       # --- in <textarea> tag ----------------------------------------
@@ -326,7 +336,7 @@ BEGIN {
         else                   {read_str_in_nq();tag_v[pn]=str2 str       ;}
         if     (pn=="n"      ) {selnam=str                                ;}
       }
-      restore_and_print_the_tag(tag_s,tag_p,tag_v);
+      restore_and_print_the_tag();
       nam=("n" in tag_v)?tag_v["n"]:""; sub(/^=/,"",nam);
       if      (match(nam,/^\042[^\042]*\042$/)) {nam=substr(nam,2,RLENGTH-2);}
       else if (match(nam,/^\047[^\047]*\047$/)) {nam=substr(nam,2,RLENGTH-2);}
@@ -376,8 +386,57 @@ BEGIN {
 #   for the next function.
 # ====================================================================
 
+# === Print : the area from anywhere to tagname ======================
+# [Action] : * Print the string until the first found tagname
+#            * Memorize
+#              -> variable "str" ... the first found tagname
+#            * Advance the cursor NEXT TO the tagname string
+# [Until]  : "(TAGNAME)"
+# [Regexp] : /.+<(TAGNAME)/
+function print_until_the_start_of_a_tag( step,i) {
+  str=""; step=0;
+  while (line!="") {
+    if        (step==0) {
+      i=index(line,"<");
+      if (i==0)                            {
+        print line;
+        line= ""  ;
+      } else if (substr(line,i,4)=="<!--") {
+        str = "!--"                 ;
+        print substr(line,1  ,i) str;
+        line= substr(line,i+4  )    ;
+        break;
+      } else                               {
+        print substr(line,1,i);
+        line= substr(line,i+1);
+        step++;
+      }
+    } else if (step==1) {
+      match(line,/^[ \t\n]+/);
+      if (RSTART>0) {
+        print substr(line,1        ,RLENGTH);
+        line= substr(line,RLENGTH+1        );
+      } else        {
+        step++;
+      }
+    } else if (step==2) {
+      match(line,/^\/?[^ \t\n>\/]+/);
+      if (RSTART>0) {
+        str = substr(line,1             ,RLENGTH);
+        print str                                ;
+        line= substr(line,RSTART+RLENGTH        );
+        break;
+      } else        {
+        # unnamed tag (It is strange, but I accept it)
+        break;
+      }
+    }
+    if (line=="") {if(getline line < file_t){line=line "\n";}}
+  }
+}
+
 # === Read : the area from anywhere to tagname =======================
-# [Action] : * Memorize string until the first found tag name
+# [Action] : * Memorize string until the first found tagname
 #              -> variable "str0" .. former string than tag
 #              -> variable "str" ... tagname
 #            * Advance the cursor NEXT TO the tagname string
@@ -390,14 +449,16 @@ function read_until_the_start_of_a_tag( step,i) {
     if        (step==0) {
       i=index(line,"<");
       if (i==0)                            {
-        str0=str0 line;line="";
+        str0=str0 line;
+        line=""       ;
       } else if (substr(line,i,4)=="<!--") {
-        str =     "!--"           ;
-        str0=str0 substr(line,1,i);
-        line=     substr(line,i+4);
+        str =     "!--"             ;
+        str0=str0 substr(line,1  ,i);
+        line=     substr(line,i+4  );
         break;
       } else                               {
-        str0=str0 substr(line,1,i);line= substr(line,i+1);
+        str0=str0 substr(line,1  ,i);
+        line=     substr(line,i+1  );
         step++;
       }
     } else if (step==1) {
@@ -594,14 +655,14 @@ function read_strs_to_property_name( step,i) {
 # ====================================================================
 
 # === Read /([[:space:]]*)(PROPERTY)(=[(DQ)(SQ)]?)?/ =================
-# [in]  : Variabes "tag_s" .. property items layout strings
-#                             tag_s="  (1) (2)/>" when <foo  a="b" c="d"/>
-#                  "tag_p" .. array which contains property strings
-#                             tag_p[1]="a=\"b\"" when the above tag
-#                  "tag_v" .. array which contains value strings
-#                             tag_v[1]="=\"b\"" when the above tag
-# [out] : Stdout ............ Restored tag (without tag name part)
-function restore_and_print_the_tag(tag_s,tag_p,tag_v, str,pn,s1,s2) {
+# [in]  : Global var. "tag_s" .. property items layout strings
+#                                tag_s="  (1) (2)>" when <foo  a="b" c="d">
+#                     "tag_p" .. array which contains property strings
+#                                tag_p[1]="a=\"b\"" when the above tag
+#                     "tag_v" .. array which contains value strings
+#                                tag_v[1]="=\"b\"" when the above tag
+# [out] : Stdout ............... Restored tag (without tagname part)
+function restore_and_print_the_tag( str,pn,s1,s2) {
   str=tag_s;
   while (str!="") {
     if (match(str,/\([0-9a-z]+\)/)) {
@@ -621,16 +682,14 @@ function restore_and_print_the_tag(tag_s,tag_p,tag_v, str,pn,s1,s2) {
 # ====================================================================
 
 # === Do "HAME" for <input> ==========================================
-# [in]  : Variabes "tag_s" .. property items layout strings
-#                             tag_s="  (1) (2)/>" when <foo  a="b" c="d"/>
-#                  "tag_p" .. array which contains property strings
-#                             tag_p[1]="a=\"b\"" when the above tag
-#                  "tag_v" .. array which contains value strings
-#                             tag_v[1]="=\"b\"" when the above tag
-# [out] : Retval ............ tag_s which has been done "HAME"
-#         tag_p (refernce) .. tag_p which has been done "HAME"
-#         tag_v (refernce) .. tag_v which has been done "HAME"
-function input_tag_hame(tag_s,tag_p,tag_v, typ,nam,val,s) {
+# [in/out] : Global Variabes (edit strings in these for doing "HAME")
+#              "tag_s" ... property items layout strings
+#                          tag_s="  (1) (2)/>" when <foo  a="b" c="d"/>
+#              "tag_p" ... array which contains property strings
+#                          tag_p[1]="a=\"b\"" when the above tag
+#              "tag_v" ... array which contains value strings
+#                          tag_v[1]="=\"b\"" when the above tag
+function input_tag_hame( typ,nam,val,s) {
   typ=("t" in tag_v)?tolower(tag_v["t"]):""; sub(/^=/,"",typ);
   if      (match(typ,/^\042[^\042]*\042$/)) {typ=substr(typ,2,RLENGTH-2);}
   else if (match(typ,/^\047[^\047]*\047$/)) {typ=substr(typ,2,RLENGTH-2);}
@@ -675,14 +734,12 @@ function input_tag_hame(tag_s,tag_p,tag_v, typ,nam,val,s) {
 }
 
 # === Do "HAME" for <option> =========================================
-# [in]  : Variabes "tag_s", "tag_p", "tag_v" (same as input_tag_hame())
-#                  * But tag_p and tag_v have to have the "v" item.
-#                    If it does not still have, you have to prepare a dummy
-#                    one with the string between <option> and </option>.
-# [out] : Retval ............ tag_s which has been done "HAME"
-#         tag_p (refernce) .. tag_p which has been done "HAME"
-#         tag_v (refernce) .. tag_v which has been done "HAME"
-function option_tag_hame(tag_s,tag_p,tag_v, val,s) {
+# [in/out] : Global Variabes (edit strings in these for doing "HAME")
+#           * Variables are the same as input_tag_hame()
+#           * But tag_p and tag_v have to have the "v" item.
+#             If it does not still have, you have to prepare a dummy
+#             one with the string between <option> and </option>.
+function option_tag_hame( val,s) {
   if (!(selnam in name_list)) {return tag_s;}
   if (!("v" in tag_v)       ) {return tag_s;}
   val=tag_v["v"]; sub(/^=/,"",val);
