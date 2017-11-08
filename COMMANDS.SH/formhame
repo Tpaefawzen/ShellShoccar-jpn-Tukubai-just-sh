@@ -8,8 +8,12 @@
 #
 #        <html_template> HTML file you want to replace values
 #        <data_file> ... Text file which has "Name-Format" data
-#        -s<c> ......... Replaces all of the space " "s in value part
-#                        of strings with <c>
+#        -s<c> ......... Replaces every <c> character which <data_file>
+#                        has on value field into white space (" ") 
+#                        of strings with <c>. But backslash escaped
+#                        one (\<c>) will be guarded as it is. (\<c>)
+#        -e ............ Disable the backslash guard of the "-s" option
+#                        So, \<c> will be substituted with <c>
 #        -n<string> .... Treat the strings in <data_file> which are
 #                        completely the same as <string> as null
 #        -d, -i ........ Obsolete names and work equivalently as
@@ -44,13 +48,17 @@ print_usage_and_exit () {
 	Usage   : ${0##*/} [options] <html_template> <data_file>
 	Args    : <html_template> HTML file you want to replace values
 	          <data_file> ... Text file which has "Name-Format" data
-	Options : -s<c> ......... Replaces all of the space " "s in value part
-	                          of strings with <c>
+	Options : -s<c> ......... Replaces every <c> character which <data_file>
+	                          has on value field into white space (" ") 
+	                          of strings with <c>. But backslash escaped
+	                          one (\<c>) will be guarded as it is. (\<c>)
+	          -e ............ Disable the backslash guard of the "-s<c>"
+	                          So, \<c> will be substituted with <c>
 	          -n<string> .... Treat the strings in <data_file> which are
 	                          completely the same as <string> as null
 	          -d, -i ........ Obsolete name and work equivalently as
 	                          -s, -n respectively
-	Version : 2017-11-07 20:47:43 JST
+	Version : 2017-11-07 19:58:24 JST
 	          Open usp Tukubai (POSIX Bourne Shell/POSIX commands)
 	USAGE
   exit 1
@@ -69,6 +77,7 @@ error_exit() {
 # --- initialize option parameters -----------------------------------
 opts=''
 opts_is_set=0
+opte_is_set=0
 optn=''
 optf=''
 file_tmpl=''
@@ -89,6 +98,10 @@ for arg in "$@"; do
     fi
     break
   fi
+  case "$optmode $arg" in
+    ' -e')  opte_is_set=1; continue        ;;
+    ' -e'*) opte_is_set=1; arg="-${arg#-e}";;
+  esac
   case "$optmode" in
      '') case "$arg" in
            -[sd]*)
@@ -152,7 +165,7 @@ fi
 # Main Routine
 ######################################################################
 
-export opts opts_is_set optn file_tmpl file_data
+export opts opts_is_set opte_is_set optn file_tmpl file_data
 exec awk '
 # ====================================================================
 # Main Routine (in AWK script)
@@ -162,15 +175,16 @@ BEGIN {
   OFS=""; ORS="";
   file_t     =ENVIRON["file_tmpl"  ]   ;
   file_d     =ENVIRON["file_data"  ]   ;
-  optn       =ENVIRON["optn"       ] "";
-  opts       =ENVIRON["optn"       ] "";
+  opts       =ENVIRON["opts"       ] "";
   opts_is_set=ENVIRON["opts_is_set"]+ 0;
+  opte_is_set=ENVIRON["opte_is_set"]+ 0;
+  optn       =ENVIRON["optn"       ] "";
 
   for (i=0; i<256; i++) {s=sprintf("%c",i);esc[s]=s;}
   esc["n" ]="\n"  ; esc["r" ]="\r"  ; esc["t" ]="\t"  ; esc["\\"]="\\"  ;
  #esc["a" ]="\007"; esc["b" ]="\010"; esc["f" ]="\014"; esc["v" ]="\013";
   esc[""  ]="\\"  ;
-  if (opts_is_set) {esc[opts]=opts;}
+  if (opts_is_set) {esc[opts]=((opte_is_set)?"":"\\") opts;}
 
   # === Remember the names and its values ============================
   split("", name_list); # "name" string list for <form>
