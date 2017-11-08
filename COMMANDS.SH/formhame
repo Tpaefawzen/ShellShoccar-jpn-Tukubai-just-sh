@@ -20,7 +20,7 @@
 #                        -s, -n respectively
 #
 # Designed originally by Nobuaki Tounaka
-# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-11-07
+# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-11-09
 #
 # This is a public-domain software (CC0). It means that all of the
 # people can use this for any purposes with no restrictions at all.
@@ -58,7 +58,7 @@ print_usage_and_exit () {
 	                          completely the same as <string> as null
 	          -d, -i ........ Obsolete name and work equivalently as
 	                          -s, -n respectively
-	Version : 2017-11-07 20:02:46 JST
+	Version : 2017-11-09 00:14:54 JST
 	          Open usp Tukubai (POSIX Bourne Shell/POSIX commands)
 	USAGE
   exit 1
@@ -317,6 +317,7 @@ BEGIN {
       restore_and_print_the_tag();
       # 3) print the string which follows the <option>
       print s_prn;
+      #
       tag=tag2;
     } else if (tag=="select"  ) {
       # --- in <select> tag ------------------------------------------
@@ -371,11 +372,12 @@ BEGIN {
         }
       }
       # 2) print the substitute value
-      print name_list[nam];
+      print "\n",name_list[nam];
       # 3) print the following </textarea> area
       s=str0 str;
       if (match(s,/<[^<]+$/)) {print substr(s,RSTART);                    }
       else                    {print "unexp-err #2\n" | "cat 1>&2";exit 1;}
+      #
       tag=tag2;
     } else                      {
       # --- in any other (untreated) tag -----------------------------
