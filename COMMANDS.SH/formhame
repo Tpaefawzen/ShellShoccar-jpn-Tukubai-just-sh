@@ -12,7 +12,7 @@
 #                        has on value field into white space (" ") 
 #                        of strings with <c>. But backslash escaped
 #                        one (\<c>) will be guarded as it is. (\<c>)
-#        -e ............ Disable the backslash guard of the "-s" option
+#        -e ............ Disable the backslash guard of the "-s<c>"
 #                        So, \<c> will be substituted with <c>
 #        -n<string> .... Treat the strings in <data_file> which are
 #                        completely the same as <string> as null
@@ -58,7 +58,7 @@ print_usage_and_exit () {
 	                          completely the same as <string> as null
 	          -d, -i ........ Obsolete name and work equivalently as
 	                          -s, -n respectively
-	Version : 2017-11-07 19:58:24 JST
+	Version : 2017-11-07 20:02:46 JST
 	          Open usp Tukubai (POSIX Bourne Shell/POSIX commands)
 	USAGE
   exit 1
