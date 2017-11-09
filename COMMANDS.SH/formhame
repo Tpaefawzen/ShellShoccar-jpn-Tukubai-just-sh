@@ -16,11 +16,14 @@
 #                        So, \<c> will be substituted with <c>
 #        -n<string> .... Treat the strings in <data_file> which are
 #                        completely the same as <string> as null
+#        --form <name>   Restrict the applying tags to the area which
+#                        is enclosed between the form tag whose name
+#                        property is <name>
 #        -d, -i ........ Obsolete names and work equivalently as
 #                        -s, -n respectively
 #
 # Designed originally by Nobuaki Tounaka
-# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-11-09
+# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-11-10
 #
 # This is a public-domain software (CC0). It means that all of the
 # people can use this for any purposes with no restrictions at all.
@@ -56,9 +59,12 @@ print_usage_and_exit () {
 	                          So, \<c> will be substituted with <c>
 	          -n<string> .... Treat the strings in <data_file> which are
 	                          completely the same as <string> as null
+	          --form <name>   Restrict the applying tags to the area which
+	                          is enclosed between the form tag whose name
+	                          property is <name>
 	          -d, -i ........ Obsolete name and work equivalently as
 	                          -s, -n respectively
-	Version : 2017-11-09 00:14:54 JST
+	Version : 2017-11-10 01:26:05 JST
 	          Open usp Tukubai (POSIX Bourne Shell/POSIX commands)
 	USAGE
   exit 1
@@ -80,6 +86,7 @@ opts_is_set=0
 opte_is_set=0
 optn=''
 optf=''
+optf_is_set=0
 file_tmpl=''
 file_data=''
 #
@@ -121,6 +128,8 @@ for arg in "$@"; do
          esac
          ;;
     'f') optf=$arg
+         optf_is_set=1
+         optmode=''
          ;;
   esac
 done
@@ -165,7 +174,7 @@ fi
 # Main Routine
 ######################################################################
 
-export opts opts_is_set opte_is_set optn file_tmpl file_data
+export opts opts_is_set opte_is_set optn optf optf_is_set file_tmpl file_data
 exec awk '
 # ====================================================================
 # Main Routine (in AWK script)
@@ -179,6 +188,8 @@ BEGIN {
   opts_is_set=ENVIRON["opts_is_set"]+ 0;
   opte_is_set=ENVIRON["opte_is_set"]+ 0;
   optn       =ENVIRON["optn"       ] "";
+  optf       =ENVIRON["optf"       ] "";
+  optf_is_set=ENVIRON["optf_is_set"]+ 0;
 
   for (i=0; i<256; i++) {s=sprintf("%c",i);esc[s]=s;}
   esc["n" ]="\n"  ; esc["r" ]="\r"  ; esc["t" ]="\t"  ; esc["\\"]="\\"  ;
@@ -214,7 +225,8 @@ BEGIN {
   }
 
   # === Replacing HTML Form Values ===================================
-  tag=""; selnum="";
+  tag=""; selnam=""; #    The string is useful for default because that
+  frmnam="\042\047"; #<-- is an impossible string as a HTML property value
   if(getline line < file_t){line=line "\n";}
   while (line!="") {
     if        (tag==""        ) {
@@ -244,7 +256,9 @@ BEGIN {
         else if(str2=="=\047") {read_str_in_sq();tag_v[pn]=str2 str "\047";}
         else                   {read_str_in_nq();tag_v[pn]=str2 str       ;}
       }
-      input_tag_hame();
+      if ((! optf_is_set) || (frmnam==optf)) {
+        input_tag_hame();
+      }
       restore_and_print_the_tag();
       tag="";
     } else if (tag=="option"  ) {
@@ -263,6 +277,12 @@ BEGIN {
         else if(str2==""     ) {                 str      =str            ;}
         else if(str2=="=\047") {read_str_in_sq();tag_v[pn]=str2 str "\047";}
         else                   {read_str_in_nq();tag_v[pn]=str2 str       ;}
+      }
+      # (x). in the case that form is not the target by the --form option
+      if ((optf_is_set) && (frmnam!=optf)) {
+        restore_and_print_the_tag();
+        tag="";
+        continue;
       }
       # (a). for <option> tag which has "value" property
       if ("v" in tag_p) {
@@ -319,25 +339,6 @@ BEGIN {
       print s_prn;
       #
       tag=tag2;
-    } else if (tag=="select"  ) {
-      # --- in <select> tag ------------------------------------------
-      tag_s=""; split("",tag_p); split("",tag_v); selnam="";
-      for (i=1; ; i++) {
-        read_strs_to_property_name();
-        if (str==">" || str=="/>") {tag_s=tag_s str0 str;break;}
-        pro=str; s=tolower(pro);
-        if      (s=="name"   ) {pn="n" ;}
-        else                   {pn=i "";}
-        tag_s    =tag_s str0 "(" pn ")";
-        tag_p[pn]=pro                  ;
-        if     (str2=="=\042") {read_str_in_dq();tag_v[pn]=str2 str "\042";}
-        else if(str2==""     ) {                 tag_v[pn]=""             ;}
-        else if(str2=="=\047") {read_str_in_sq();tag_v[pn]=str2 str "\047";}
-        else                   {read_str_in_nq();tag_v[pn]=str2 str       ;}
-        if     (pn=="n"      ) {selnam=str                                ;}
-      }
-      restore_and_print_the_tag();
-      tag="";
     } else if (tag=="textarea") {
       # --- in <textarea> tag ----------------------------------------
       tag_s=""; split("",tag_p); split("",tag_v);
@@ -359,8 +360,10 @@ BEGIN {
       nam=("n" in tag_v)?tag_v["n"]:""; sub(/^=/,"",nam);
       if      (match(nam,/^\042[^\042]*\042$/)) {nam=substr(nam,2,RLENGTH-2);}
       else if (match(nam,/^\047[^\047]*\047$/)) {nam=substr(nam,2,RLENGTH-2);}
-      # 0) Skip if the tag has the untreated "name"
-      if (!(nam in name_list)) {tag="";continue;}
+      # 0) Skip if the tag has the untreated "name" or the tag is in an
+      #    untreated <form> tag
+      if ((optf_is_set) && (frmnam!=optf)) {tag="";continue;}
+      if (!(nam in name_list)            ) {tag="";continue;}
       # 1) Read abd throw away the former string than </textarea>
       while (line!="") {
         read_until_the_start_of_a_tag();
@@ -379,6 +382,58 @@ BEGIN {
       else                    {print "unexp-err #2\n" | "cat 1>&2";exit 1;}
       #
       tag=tag2;
+    } else if (tag=="select"  ) {
+      # --- in <select> tag ------------------------------------------
+      tag_s=""; split("",tag_p); split("",tag_v); selnam="";
+      for (i=1; ; i++) {
+        read_strs_to_property_name();
+        if (str==">" || str=="/>") {tag_s=tag_s str0 str;break;}
+        pro=str; s=tolower(pro);
+        if      (s=="name"   ) {pn="n" ;}
+        else                   {pn=i "";}
+        tag_s    =tag_s str0 "(" pn ")";
+        tag_p[pn]=pro                  ;
+        if     (str2=="=\042") {read_str_in_dq();tag_v[pn]=str2 str "\042";}
+        else if(str2==""     ) {                 tag_v[pn]=""             ;}
+        else if(str2=="=\047") {read_str_in_sq();tag_v[pn]=str2 str "\047";}
+        else                   {read_str_in_nq();tag_v[pn]=str2 str       ;}
+        if     (pn=="n"      ) {selnam=str                                ;}
+      }
+      restore_and_print_the_tag();
+      tag="";
+    } else if (tag=="form"    ) {
+      # --- in <form> tag --------------------------------------------
+      tag_s=""; split("",tag_p); split("",tag_v); frmnam="";
+      for (i=1; ; i++) {
+        read_strs_to_property_name();
+        if (str==">" || str=="/>") {tag_s=tag_s str0 str;break;}
+        pro=str; s=tolower(pro);
+        if      (s=="name"   ) {pn="n" ;}
+        else                   {pn=i "";}
+        tag_s    =tag_s str0 "(" pn ")";
+        tag_p[pn]=pro                  ;
+        if     (str2=="=\042") {read_str_in_dq();tag_v[pn]=str2 str "\042";}
+        else if(str2==""     ) {                 tag_v[pn]=""             ;}
+        else if(str2=="=\047") {read_str_in_sq();tag_v[pn]=str2 str "\047";}
+        else                   {read_str_in_nq();tag_v[pn]=str2 str       ;}
+        if     (pn=="n"      ) {frmnam=str                                ;}
+      }
+      restore_and_print_the_tag();
+      tag="";
+    } else if (tag=="/form"   ) {
+      # --- in </form> tag -------------------------------------------
+      frmnam="\042\047";
+      while (str!=">") {
+        print_for_untreated_tags();
+        if        (str=="\042") {
+          read_str_in_dq();
+          print str,"\042";
+        } else if (str=="\047") {
+          read_str_in_sq();
+          print str,"\047";
+        }
+      }
+      tag="";
     } else                      {
       # --- in any other (untreated) tag -----------------------------
       while (str!=">") {
