@@ -364,7 +364,7 @@ BEGIN {
       #    untreated <form> tag
       if ((optf_is_set) && (frmnam!=optf)) {tag="";continue;}
       if (!(nam in name_list)            ) {tag="";continue;}
-      # 1) Read abd throw away the former string than </textarea>
+      # 1) Read and throw away the former string than </textarea>
       while (line!="") {
         read_until_the_start_of_a_tag();
         tag2=tolower(str);
