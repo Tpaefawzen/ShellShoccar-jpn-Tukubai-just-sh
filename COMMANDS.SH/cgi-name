@@ -22,7 +22,7 @@
 #                      or "checkbox}" 
 #
 # Designed originally by Nobuaki Tounaka
-# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-09-27
+# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2018-03-26
 #
 # This is a public-domain software (CC0). It means that all of the
 # people can use this for any purposes with no restrictions at all.
@@ -61,7 +61,7 @@ print_usage_and_exit () {
 	                        in the data from <param_file> even though the same
 	                        variables exist <html> as a <input type="radio">
 	                        or "checkbox}" 
-	Version : 2017-09-27 17:15:10 JST
+	Version : 2018-03-26 23:19:45 JST
 	          Open usp Tukubai (POSIX Bourne Shell/POSIX commands)
 	USAGE
   exit 1
@@ -224,6 +224,7 @@ case $opte_is_set in                                     #
   *) sed 's/%5C/\\/g' | sed 's/\\/\\\\/g';;              #
 esac                                                     |
 sed 's/%0D%0A/\\n/g'                                     |
+sed 's/%0A/\\n/g'                                        |
 sed 's/&/'"$LFs"'/g'                                     |
 sed 's/+/ /g'                                            |
 grep '^[^=]\{1,\}='                                      |
