@@ -27,7 +27,7 @@
 #        <tran> .. Text file which is a transaction data
 #
 # Designed originally by Nobuaki Tounaka
-# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-09-13
+# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2018-09-13
 #
 # This is a public-domain software (CC0). It means that all of the
 # people can use this for any purposes with no restrictions at all.
@@ -71,7 +71,7 @@ print_usage_and_exit () {
 	                        used the same character before and after "/".
 	                        For instance, "2n/5n" is correct, but "2n/5N"
 	                        and "2n/5" are wrong.
-	Version : 2017-09-13 02:52:28 JST
+	Version : 2018-09-13 01:12:35 JST
 	          Open usp Tukubai (POSIX Bourne Shell/POSIX commands/UTF-8)
 	            * Although "-s" (stable sort) supported sort command produces
 	              better performance than non-supported one
@@ -85,9 +85,10 @@ error_exit() {
 
 # === Define an exit trap function for delete temporary dirs =========
 exit_trap() {
+  set -- ${1:-} $?  # $? is set as $1 if no argument given
   trap '-' EXIT HUP INT QUIT PIPE ALRM TERM
   [ -d "${Tmp:-}" ] && rm -rf "${Tmp%/*}/_${Tmp##*/_}"
-  exit ${1:-0}
+  exit $1
 }
 
 # === Define the function for the alternative of the "mktemp -d -t" ==
