@@ -28,7 +28,7 @@
 #                  (<string>'s default is "*")
 #
 # Designed originally by Nobuaki Tounaka
-# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-09-20
+# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2019-01-14
 #
 # This is a public-domain software (CC0). It means that all of the
 # people can use this for any purposes with no restrictions at all.
@@ -73,7 +73,7 @@ print_usage_and_exit () {
 	          -d,+ .... Substitute string by <string>, it will be used for
 	                    lines in the transaction data which can't be joined.
 	                    (<string>'s default is "*")
-	Version : 2017-09-20 18:25:28 JST
+	Version : 2019-01-14 22:40:21 JST
 	          Open usp Tukubai (POSIX Bourne Shell/POSIX commands/UTF-8)
 	USAGE
   exit 1
@@ -115,11 +115,15 @@ for arg in "$@"; do
         if [ -f "$arg" ] || [ -c "$arg" ] || [ -p "$arg" ] || [ "_$arg" = '_-' ]
         then
           masterfile=$arg
+        else
+          error_exit 1 'Invalid masterfile'
         fi
       elif [ -z "$tranfile" ]; then
         if [ -f "$arg" ] || [ -c "$arg" ] || [ -p "$arg" ] || [ "_$arg" = '_-' ]
         then
           tranfile=$arg
+        else
+          error_exit 1 'Invalid tranfile'
         fi
       else
         print_usage_and_exit
@@ -316,6 +320,9 @@ BEGIN {
     for (   ; i<=NF            ; i++) {print dlm,$i;        }
     print "\n";
   }
+
+  # --- finish with no regular rules ---------------------------------
+  exit;
 }
 
 END {
@@ -411,6 +418,9 @@ BEGIN {
     for (   ; i<=NF     ; i++) {print dlm,$i;        }
     print "\n";
   }
+
+  # --- finish with no regular rules ---------------------------------
+  exit;
 }
 
 END {

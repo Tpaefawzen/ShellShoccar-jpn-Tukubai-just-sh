@@ -27,7 +27,7 @@
 #                  filedescriptor <fd>. (<fd>'s default is 2)
 #
 # Designed originally by Nobuaki Tounaka
-# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2017-09-20
+# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2019-01-14
 #
 # This is a public-domain software (CC0). It means that all of the
 # people can use this for any purposes with no restrictions at all.
@@ -71,7 +71,7 @@ print_usage_and_exit () {
 	                        referred in the masterdata.
 	          +ng ..... Output the lines which can't be joined to
 	                    filedescriptor <fd>. (<fd>'s default is 2)
-	Version : 2017-09-20 18:25:11 JST
+	Version : 2019-01-14 22:44:22 JST
 	          Open usp Tukubai (POSIX Bourne Shell/POSIX commands/UTF-8)
 	USAGE
   exit 1
@@ -117,11 +117,15 @@ for arg in "$@"; do
         if [ -f "$arg" ] || [ -c "$arg" ] || [ -p "$arg" ] || [ "_$arg" = '_-' ]
         then
           masterfile=$arg
+        else
+          error_exit 1 'Invalid masterfile'
         fi
       elif [ -z "$tranfile" ]; then
         if [ -f "$arg" ] || [ -c "$arg" ] || [ -p "$arg" ] || [ "_$arg" = '_-' ]
         then
           tranfile=$arg
+        else
+          error_exit 1 'Invalid tranfile'
         fi
       else
         print_usage_and_exit
@@ -277,6 +281,9 @@ BEGIN {
     '"$ifng"'  print $0,"\n" > "'"$ng"'";
     }
   }
+
+  # --- finish with no regular rules ---------------------------------
+  exit;
 }
 
 END {
@@ -362,6 +369,9 @@ BEGIN {
     '"$ifng"'  print $0,"\n" > "'"$ng"'";
     }
   }
+
+  # --- finish with no regular rules ---------------------------------
+  exit;
 }
 
 END {
