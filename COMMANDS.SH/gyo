@@ -1,73 +1,98 @@
-#! /bin/sh
+#!/bin/sh
 
-# designed by Nobuaki Tounaka
-# written by 321516
+######################################################################
+#
+# GYO - Count the Number of Lines the Specified File Has
+#
+# Usage  : gyo [-f] <file> ...
+#
+#          <file> ..... File to count
+#
+# Options: -f ......... Insert the filename before the number
+#
+# Designed originally by Nobuaki Tounaka
+# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2020-06-22
+#
+# This is a public-domain software (CC0). It means that all of the
+# people can use this for any purposes with no restrictions at all.
+# By the way, we are fed up with the side effects which are brought
+# about by the major licenses.
+#
+######################################################################
 
-# print the usage and exit
+
+######################################################################
+# Initial Configuration
+######################################################################
+
+# === Initialize shell environment ===================================
+set -u
+umask 0022
+export LC_ALL=C
+export PATH="$(command -p getconf PATH 2>/dev/null)${PATH+:}${PATH-}"
+case $PATH in :*) PATH=${PATH#?};; esac
+export UNIX_STD=2003  # to make HP-UX conform to POSIX
+
+# === Define the functions for printing usage and error message ======
 print_usage_and_exit () {
-  cat <<-__USAGE 1>&2
-	Usage   : ${0##*/} [-f] <file> ...
-	Version : Wed Sep 23 17:31:05 JST 2015
-	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
-__USAGE
+  cat <<-USAGE 1>&2
+	Usage   : gyo [-f] <file> ...
+	          <file> ..... File to count
+	Options : -f ......... Insert the filename before the number
+	Version : 2020-06-22 21:02:00 JST
+	          Open usp Tukubai (POSIX Bourne Shell/POSIX commands)
+	USAGE
   exit 1
+}
+error_exit() {
+  ${2+:} false && echo "${0##*/}: $2" 1>&2
+  exit $1
 }
 
 
-# initialize
-set -u
-umask 0022
-PATH='/usr/bin:/bin'
-IFS=$(printf ' \t\n_'); IFS=${IFS%_}
-export IFS LANG=C LC_ALL=C PATH
+######################################################################
+# Parse Arguments
+######################################################################
+
+# === Get the options and the filepaths ==============================
+# --- initialize option parameters -----------------------------------
 fopt=0
-use_stdin=0
-
-
-# parse argument
+#
+# --- get them -------------------------------------------------------
 case $# in [!0]*)
   case "$1" in '-f') fopt=1; shift;; esac
   ;;
 esac
+#
+# --- Regard that the data is from stdin if no file argument ---------
+case $# in 0) set -- -;; esac
 
-# FUNC: counting
-counting() {
-  if [ \( "_$1" = '_-'               \) -o \
-       \( "_$1" = '_/dev/stdin'      \) -o \
-       \( "_$1" = '_/dev/fd/0'       \) -o \
-       \( "_$1" = '_/proc/self/fd/0' \)    ]
-  then
-    case $use_stdin in
-      [!0]*) printf '%s: stdin can be used only once in the arguments\n' \
-                    "${0##*/}" 1>&2
-             exit 1
-             ;;
-    esac
-    use_stdin=$((use_stdin+1))
-    file=$1
-  elif [ \( -f "$1" \) -o \( -c "$1" \) -o \( -p "$1" \) ]; then
-    file=$1
-    if [ \( ! -r "$file" \) -a \( "_$file" != '_-' \) ]; then
-      printf '%s: Cannot open the file "%s"\n' "${0##*/}" "$1" 1>&2
-      exit 1
-    fi
-  else
-    print_usage_and_exit
+
+######################################################################
+# Main
+######################################################################
+
+# === set local parameters ===========================================
+use_stdin=0
+
+# === count lines ====================================================
+for file in "$@"; do
+  dispfile=$file
+  # --- Make sure that it is a readable file -------------------------
+  if [ ! -f "$file" ] && [ ! -c "$file"     ] &&
+     [ ! -p "$file" ] && [ "_$file" != '_-' ]   ; then
+    error_exit 1 "$file: Invalid file"
   fi
+  #
+  # --- Filepath protection  -----------------------------------------
   case "$file" in ''|-|/*|./*|../*) :;; *) file="./$file";; esac
-
-  (cat "$file"; echo '') |
-  sed '${/^$/d;}'        |
-  wc -l                  |
-  case $fopt in
-    0)                       tr -d ' \t';;
-    *) printf '%s ' "$file"; tr -d ' \t';;
+  #
+  # --- Count --------------------------------------------------------
+  cat "$file"                                  |
+  grep ^                                       |
+  wc -l                                        |
+  case $fopt in                                #
+    0)                           tr -d ' \t';; #
+    *) printf '%s ' "$dispfile"; tr -d ' \t';; #
   esac
-}
-
-
-# count lines
-case $# in
-  0)                     counting '-'         ;;
-  *) for arg in "$@"; do counting "$arg"; done;;
-esac
+done
