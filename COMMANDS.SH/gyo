@@ -11,7 +11,7 @@
 # Options: -f ......... Insert the filename before the number
 #
 # Designed originally by Nobuaki Tounaka
-# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2020-06-22
+# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2020-06-23
 #
 # This is a public-domain software (CC0). It means that all of the
 # people can use this for any purposes with no restrictions at all.
@@ -39,7 +39,7 @@ print_usage_and_exit () {
 	Usage   : gyo [-f] <file> ...
 	          <file> ..... File to count
 	Options : -f ......... Insert the filename before the number
-	Version : 2020-06-22 21:02:00 JST
+	Version : 2020-06-23 00:26:21 JST
 	          Open usp Tukubai (POSIX Bourne Shell/POSIX commands)
 	USAGE
   exit 1
@@ -88,8 +88,7 @@ for file in "$@"; do
   case "$file" in ''|-|/*|./*|../*) :;; *) file="./$file";; esac
   #
   # --- Count --------------------------------------------------------
-  cat "$file"                                  |
-  grep ^                                       |
+  grep ^ "$file"                               |
   wc -l                                        |
   case $fopt in                                #
     0)                           tr -d ' \t';; #
