@@ -27,7 +27,7 @@
 #                      automatically set as much as needed)
 #
 # Designed originally by Nobuaki Tounaka
-# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2020-05-06
+# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2020-12-06
 #
 # This is a public-domain software (CC0). It means that all of the
 # people can use this for any purposes with no restrictions at all.
@@ -72,7 +72,7 @@ print_usage_and_exit () {
 	          -v .......... Print the maximum width of each field of all lines.
 	          -- .......... Left-justified mode. (All the widths will be
 	                        automatically set as much as needed)
-	Version : 2020-05-06 22:42:19 JST
+	Version : 2020-12-06 03:13:19 JST
 	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands/UTF-8)
 	USAGE
   exit 1
@@ -85,8 +85,9 @@ error_exit() {
 # === Define an exit trap function for delete temporary files ========
 exit_trap() {
   set -- ${1:-} $?  # $? is set as $1 if no argument given
-  trap '-' EXIT HUP INT QUIT PIPE ALRM TERM
+  trap '' EXIT HUP INT QUIT PIPE ALRM TERM
   [ -f "${Tmpfile:-}" ] && rm -rf "${Tmpfile%/*}/_${Tmpfile##*/_}"
+  trap -  EXIT HUP INT QUIT PIPE ALRM TERM
   exit $1
 }
 

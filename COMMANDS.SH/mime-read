@@ -11,7 +11,7 @@
 #        -v .... Just lists the names which are contained in the MIME data
 #
 # Designed originally by Nobuaki Tounaka
-# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2020-05-06
+# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2020-12-06
 #
 # This is a public-domain software (CC0). It means that all of the
 # people can use this for any purposes with no restrictions at all.
@@ -39,7 +39,7 @@ print_usage_and_exit () {
 	Usage   : ${0##*/} [-v] <name> <MIME-file>
 	Args    : <MIME-file> .. MIME data file
 	Options : -v .... Just lists the names which are contained in the MIME data
-	Version : 2020-05-06 22:42:19 JST
+	Version : 2020-12-06 03:16:41 JST
 	          Open usp Tukubai (POSIX Bourne Shell/POSIX commands)
 	            * Although GNU AWK produces better performance than the
 	              other AWKs
@@ -116,8 +116,9 @@ case "$mime_file" in ''|-|/*|./*|../*) :;; *) mime_file="./$mime_file";; esac
 tmpfiles=''
 exit_trap() {
   set -- ${1:-} $?  # $? is set as $1 if no argument given
-  trap '-' EXIT HUP INT QUIT PIPE ALRM TERM
+  trap '' EXIT HUP INT QUIT PIPE ALRM TERM
   rm -f ${tmpfiles:-}
+  trap -  EXIT HUP INT QUIT PIPE ALRM TERM
   exit $1
 }
 # --- FUNC : the alternative of the which command --------------------
