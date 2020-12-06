@@ -28,7 +28,7 @@
 #                  (<string>'s default is "*")
 #
 # Designed originally by Nobuaki Tounaka
-# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2020-05-06
+# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2020-12-06
 #
 # This is a public-domain software (CC0). It means that all of the
 # people can use this for any purposes with no restrictions at all.
@@ -73,7 +73,7 @@ print_usage_and_exit () {
 	          -d,+ .... Substitute string by <string>, it will be used for
 	                    lines in the transaction data which can't be joined.
 	                    (<string>'s default is "*")
-	Version : 2020-05-06 22:42:19 JST
+	Version : 2020-12-06 23:37:47 JST
 	          Open usp Tukubai (POSIX Bourne Shell/POSIX commands/UTF-8)
 	USAGE
   exit 1
@@ -99,41 +99,28 @@ tranfile=''
 #
 # --- get them -------------------------------------------------------
 case $# in [01]) print_usage_and_exit;; esac
-for arg in "$@"; do
-  case "$arg" in
-    key=*)
-      key=${arg#key=}
-      ;;
-    -d*)
-      dummy=${arg#-d}
-      ;;
-    +*)
-      dummy=${arg#+}
-      ;;
-    *)
-      if [ -z "$masterfile" ]; then
-        if [ -f "$arg" ] || [ -c "$arg" ] || [ -p "$arg" ] || [ "_$arg" = '_-' ]
-        then
-          masterfile=$arg
-        else
-          error_exit 1 'Invalid masterfile'
-        fi
-      elif [ -z "$tranfile" ]; then
-        if [ -f "$arg" ] || [ -c "$arg" ] || [ -p "$arg" ] || [ "_$arg" = '_-' ]
-        then
-          tranfile=$arg
-        else
-          error_exit 1 'Invalid tranfile'
-        fi
-      else
-        print_usage_and_exit
-      fi
-      ;;
-  esac
+while [ $# -gt 0 ]; do
+  case $1 in -d*) dummy=${1#-d};; +*) dummy=${1#+};; *) break;; esac
+  shift
 done
-case "$key"        in '') print_usage_and_exit;; esac
-case "$masterfile" in '') print_usage_and_exit;; esac
-case "$tranfile"   in '') tranfile='-'        ;; esac
+case $1 in key=*) key=${1#key=}; shift;; *) print_usage_and_exit;; esac
+case $# in                               0) print_usage_and_exit;; esac
+if [ -f "$1" ] || [ -c "$1" ] || [ -p "$1" ] || [ "_$1" = '_-' ]; then
+  masterfile=$1; shift
+else
+  error_exit 1 'Invalid masterfile'
+fi
+case $# in
+  0) :;;
+  1) if [ -f "$1" ] || [ -c "$1" ] || [ -p "$1" ] || [ "_$1" = '_-' ]; then
+       tranfile=$1; shift
+     else
+       error_exit 1 'Invalid tranfile'
+     fi
+     ;;
+  *) print_usage_and_exit;;
+esac
+case "$tranfile" in '') tranfile='-';; esac
 use_stdin=0
 for file in "$masterfile" "$tranfile"; do
   case "$file" in

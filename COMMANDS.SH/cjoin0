@@ -27,7 +27,7 @@
 #                  filedescriptor <fd>. (<fd>'s default is 2)
 #
 # Designed originally by Nobuaki Tounaka
-# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2020-05-06
+# Written by Shell-Shoccar Japan (@shellshoccarjpn) on 2020-12-06
 #
 # This is a public-domain software (CC0). It means that all of the
 # people can use this for any purposes with no restrictions at all.
@@ -71,7 +71,7 @@ print_usage_and_exit () {
 	                        referred in the masterdata.
 	          +ng ..... Output the lines which can't be joined to
 	                    filedescriptor <fd>. (<fd>'s default is 2)
-	Version : 2020-05-06 22:42:19 JST
+	Version : 2020-12-06 23:37:27 JST
 	          Open usp Tukubai (POSIX Bourne Shell/POSIX commands/UTF-8)
 	USAGE
   exit 1
@@ -97,45 +97,35 @@ tranfile=''
 #
 # --- get them -------------------------------------------------------
 case $# in [01]) print_usage_and_exit;; esac
-for arg in "$@"; do
-  case "$arg" in
-    key=*)
-      key=${arg#key=}
-      ;;
-    +ng*)
-      i=${arg#+ng}
-      case "$i" in *[!0-9]*) print_usage_and_exit;; esac
-      case "$i" in '') i=2;;  *) i=$(expr $i + 0);; esac
-      case "$i" in 0) ng='/dev/stdin' ;;
-                   1) ng='/dev/stdout';;
-                   2) ng='/dev/stderr';;
-                   *) ng="/dev/fd/$i" ;;
-      esac
-      ;;
-    *)
-      if [ -z "$masterfile" ]; then
-        if [ -f "$arg" ] || [ -c "$arg" ] || [ -p "$arg" ] || [ "_$arg" = '_-' ]
-        then
-          masterfile=$arg
-        else
-          error_exit 1 'Invalid masterfile'
-        fi
-      elif [ -z "$tranfile" ]; then
-        if [ -f "$arg" ] || [ -c "$arg" ] || [ -p "$arg" ] || [ "_$arg" = '_-' ]
-        then
-          tranfile=$arg
-        else
-          error_exit 1 'Invalid tranfile'
-        fi
-      else
-        print_usage_and_exit
-      fi
-      ;;
-  esac
-done
-case "$key"        in '') print_usage_and_exit;; esac
-case "$masterfile" in '') print_usage_and_exit;; esac
-case "$tranfile"   in '') tranfile='-'        ;; esac
+case $1 in +ng*) i=${1#+ng}
+                 case "$i" in *[!0-9]*) print_usage_and_exit;; esac
+                 case "$i" in '') i=2;;  *) i=$(expr $i + 0);; esac
+                 case "$i" in 0) ng='/dev/stdin' ;;
+                              1) ng='/dev/stdout';;
+                              2) ng='/dev/stderr';;
+                              *) ng="/dev/fd/$i" ;;
+                 esac
+                 shift
+                 ;;
+esac
+case $1 in key=*) key=${1#key=}; shift;; *) print_usage_and_exit;; esac
+case $# in                               0) print_usage_and_exit;; esac
+if [ -f "$1" ] || [ -c "$1" ] || [ -p "$1" ] || [ "_$1" = '_-' ]; then
+  masterfile=$1; shift
+else
+  error_exit 1 'Invalid masterfile'
+fi
+case $# in
+  0) :;;
+  1) if [ -f "$1" ] || [ -c "$1" ] || [ -p "$1" ] || [ "_$1" = '_-' ]; then
+       tranfile=$1; shift
+     else
+       error_exit 1 'Invalid tranfile'
+     fi
+     ;;
+  *) print_usage_and_exit;;
+esac
+case "$tranfile" in '') tranfile='-';; esac
 use_stdin=0
 for file in "$masterfile" "$tranfile"; do
   case "$file" in
