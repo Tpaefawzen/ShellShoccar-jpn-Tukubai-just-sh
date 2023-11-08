@@ -1,0 +1,7 @@
+.POSIX:
+
+__macros__
+
+all:
+	echo '???'
+	false
