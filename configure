@@ -1,0 +1,67 @@
+#!/bin/sh
+
+################################################################################
+#
+# configure.sh - Generate Makefile
+#
+# Written by Tpaefawzen on 2023-11-08
+#
+################################################################################
+
+# Boilerplate.
+set -eu
+umask 0022
+export LC_ALL=C
+if _posix_path="$( command -p getconf PATH 2>/dev/null )"; then
+	PATH="$_posix_path${PATH+:}${PATH:-}"
+fi
+export POSIXLY_CORRECT=1
+export UNIX_STD=2003
+
+#####
+# Generate makefile.
+#####
+
+exec 1>Makefile.tmp
+
+my_trap(){
+	__signal=${1:-}
+	trap '' EXIT HUP INT QUIT PIPE ABRT ALRM TERM
+	[ -e Makefile.tmp ] && rm Makefile.tmp
+	exit $__signal
+}
+trap my_trap EXIT HUP INT QUIT PIPE ABRT ALRM TERM
+
+
+#####
+# Print header.
+#####
+
+sed '/# __macros__/q' Makefile.in
+
+#####
+# BIN = ... 
+#####
+
+printf 'BIN = '
+
+# List of binary things?
+# XXX: hardcoding
+find COMMANDS.SH/ -type f \( \! -path 'COMMANDS.SH/previous.ver/*' \) |
+#
+sed '$!s/$/ \\/'
+
+#####
+# Print footer.
+#####
+
+sed -n '/# __macros__/,$p' Makefile.in |
+sed 1d
+
+#####
+# Finally
+#####
+
+trap '' EXIT HUP INT QUIT PIPE ABRT ALRM TERM
+mv Makefile.tmp Makefile
+exit 0

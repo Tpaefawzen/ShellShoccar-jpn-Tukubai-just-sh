@@ -1,7 +1,21 @@
 .POSIX:
 
-__macros__
+PKGNAME = shellshoccar-jpn-tukubai
+
+PREFIX = $$HOME/.local
+BINDIR = $(PREFIX)/bin
+MANDIR = $(PREFIX)/share/man
+DOCDIR = $(PREFIX)/share/doc/$(PKGNAME)
+
+# __macros__
 
 all:
 	echo '???'
 	false
+
+debug:
+	echo $(PREFIX)
+
+install: $(BIN)
+	mkdir -p $(BINDIR)
+	cp $(BIN) $(BINDIR)
