@@ -37,3 +37,6 @@ uninstall: uninstall-bin
 
 uninstall-bin: $(BIN)
 	cd $(BINDIR) && rm $(?F)
+
+list-installed-bin: $(BIN)
+	type $(?F)
