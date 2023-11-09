@@ -47,7 +47,7 @@ printf 'BIN = '
 
 # List of binary things?
 # XXX: hardcoding
-find COMMANDS.SH/ -type f \( \! -path 'COMMANDS.SH/previous.ver/*' \) |
+find COMMANDS.SH/ -type f |
 #
 sed '$!s/$/ \\/'
 
