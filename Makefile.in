@@ -1,21 +1,39 @@
 .POSIX:
 
+################################################################################
+# 
+# Makefile.in - Template for Makefile
+# Makefile - Makefile
+#
+# Written by Tpaefawzen on 2023-11-09
+#
+################################################################################
+
 PKGNAME = shellshoccar-jpn-tukubai
 
+DESTDIR =
 PREFIX = $$HOME/.local
-BINDIR = $(PREFIX)/bin
-MANDIR = $(PREFIX)/share/man
-DOCDIR = $(PREFIX)/share/doc/$(PKGNAME)
+BINDIR = $(DESTDIR)$(PREFIX)/bin
+MANDIR = $(DESTDIR)$(PREFIX)/share/man
+DOCDIR = $(DESTDIR)$(PREFIX)/share/doc/$(PKGNAME)
 
+# BIN = ...
 # __macros__
 
 all:
 	echo '???'
 	false
 
-debug:
-	echo $(PREFIX)
+install: install-bin
 
-install: $(BIN)
+install-bin: $(BIN)
 	mkdir -p $(BINDIR)
-	cp $(BIN) $(BINDIR)
+	cp -f $(BIN) $(BINDIR)
+
+clean-makefile: Makefile
+	rm Makefile
+
+uninstall: uninstall-bin
+
+uninstall-bin: $(BIN)
+	cd $(BINDIR) && rm $(?F)
