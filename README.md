@@ -31,7 +31,8 @@ By default, `previous.ver` things are out of installation target.
 Excluded.
 
 # TODO
-マニュアル(いる？)
+* マニュアル(いる？)
+* Is Makefile really POSIXism?
 
 # License (COMPLICATED!)
 This project comes from two repositories:
