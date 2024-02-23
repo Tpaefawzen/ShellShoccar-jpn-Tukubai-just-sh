@@ -61,20 +61,20 @@ case "$file" in ''|-|/*|./*|../*) :;; *) file="./$file";; esac
 
 # generate the awkcode of making keystring
 case "${s1%NF*}${s2%NF*}" in
-  "$s1$s2") keyfileds=$(awk -v s=$k1 -v e=$k2 '                          #
+  "$s1$s2") keyfields=$(awk -v s=$k1 -v e=$k2 '                          #
                           BEGIN{if((s==0)&&(e==0)){print "\"\"";exit;}   #
                                 if( s>e          ){i=e; e=s; s=i;    }   #
                                 for(i=s;i<=e;i++ ){printf("$%d",i)   }}' |
                         sed 's/\([0-9]\)\$/\1 FS $/g'                    )
             ;;
   '')       k1=$((0${k1#NF})); k2=$((0${k2#NF}))
-            keyfileds=$(awk -v s=$k1 -v e=$k2 '                          #
+            keyfields=$(awk -v s=$k1 -v e=$k2 '                          #
                           BEGIN{if(s>e){i=e;e=s;s=i;}                    #
                                 for(i=s;i<=e;i++){printf("$(NF%d)",i)}}' |
                         sed 's/)$/) FS $/g'                              |
                         sed 's/(NF0)/NF/g'                               )
             ;;
-  *)        keyfileds=$(printf 'getfldclstr(%s,%s)' "$k1" "$k2")
+  *)        keyfields=$(printf 'getfldclstr(%s,%s)' "$k1" "$k2")
             ;;
 esac
 
@@ -121,7 +121,7 @@ NF!=nf0{
   exit;
 }
 {
-  key = '"$keyfileds"';
+  key = '"$keyfields"';
   no_sum = 0;
   for (i=k1; i<=k2; i++) {if(!match($i,/[^@]/)){no_sum=1;break;}}
   if (! no_sum) {
