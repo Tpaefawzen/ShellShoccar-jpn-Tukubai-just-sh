@@ -79,7 +79,7 @@ esac
 
 # sum-up
 export myname=${0##*/}
-exec awk -v addcountfield=$count -v CONVFMT=%.11g -v OFMT=%.11g '
+exec awk -v addcountfield=$count -v CONVFMT='%.11g' -v OFMT='%.11g' '
 BEGIN {
   nf0  = -1;
   key0 = "";

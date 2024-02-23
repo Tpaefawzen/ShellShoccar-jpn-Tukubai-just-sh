@@ -75,7 +75,7 @@ case "$file" in ''|-|/*|./*|../*) :;; *) file="./$file";; esac
 
 # main
 export hopt numopt
-exec awk -v CONVFMT=%.11g OFMT=%.11g '
+exec awk -v CONVFMT='%.11g' -v OFMT='%.11g' '
 BEGIN {
   hdr_skip = ENVIRON["hopt"];
   for (i=0; i<hdr_skip; i++) {

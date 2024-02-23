@@ -90,7 +90,7 @@ esac
 
 # sum-up
 export myname=${0##*/}
-exec awk -v hdr_skip=$hopt -v CONVFMT=%.11g OFMT=%.11g '
+exec awk -v hdr_skip=$hopt -v CONVFMT='%.11g' -v OFMT='%.11g' '
 BEGIN {
   for (i=0; i<hdr_skip; i++) {
     if (getline line) {
