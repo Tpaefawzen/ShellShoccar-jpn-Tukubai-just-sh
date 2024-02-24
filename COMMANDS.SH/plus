@@ -1,42 +1,182 @@
 #! /bin/sh
 
+################################################################################
+#
+# plus - Argument addition
+#
+# Usage: plus NUMBER ...
+#
+# Now works with bc(1)!
+# 
+# Examples:
+#   $ plus 1 2 3 4
+#   10
+#   $ plus 1.0 2.00
+#   3.00
+#
+# Written by Tpaefawzen on 2024-02-24 22:06:28 UTC+9
+#
+# Copyright (c) 2024, Tpaefawzen
+# 
+# Permission to use, copy, modify, and/or distribute this software for 
+# any purpose with or without fee is hereby granted, provided 
+# that the above copyright notice and this permission notice appear 
+# in all copies.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS 
+# ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED 
+# WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE 
+# AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL 
+# DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, 
+# DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE 
+# OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION 
+# WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+################################################################################
+
+# (BEGIN previous signature)
 # designed by Nobuaki Tounaka
 # written by 321516
+# (END previous signature)
+
+# Boilerplate
+set -u
+umask 0022
+if _posix_path="$( command -p getconf PATH 2>/dev/null )"; then
+	export PATH="${_posix_path}${PATH+:}${PATH:-}"
+fi
+export UNIX_STD=2003
+export POSIXLY_CORRECT=1
 
 # print the usage and exit
 print_usage_and_exit () {
   cat <<-__USAGE 1>&2
 	Usage   : ${0##*/} <n1> <n2> ...
-	Version : Tue Jun 23 11:20:49 JST 2015
+	Version : 2024-02-24 22:06:28 UTC+9
 	        : Open usp Tukubai (POSIX.1 Bourne Shell/POSIX.1 commands)
 __USAGE
   exit 1
 }
 
+# error message.
+error_exit() {
+	printf '%s: %s\n' "${0##*/}: $1" 1>&2
+	exit 1 # Do we REALLY need other exit values?
+}
 
-# initialize
-set -u
-umask 0022
-PATH='/usr/bin:/bin'
-IFS=$(printf ' \t\n_'); IFS=${IFS%_}
-export IFS LANG=C LC_ALL=C PATH
-
-# parse arguments
+# == parse arguments ==
 case $# in 0) print_usage_and_exit;; esac
+case "$# $1" in '1 -h'|'1 --help'|'1 --usage') print_usage_and_exit ;;esac
 
-# make the formula
-formula=$(printf '%s ' "$*"                     |
-          tr '\t\n' '  '                        |
-          grep -v '[^0-9. +-]'                  |
-          sed 's/\([^ ]\{1,\}\) \{1,\}/(\1)+/g' |
-          sed 's/+$//'                          )
-case "$formula" in '') print_usage_and_exit;; esac
+# == Construct a bc(1) program. ==
+formula=''
 
-# calculating
-awk "BEGIN{print $formula;}" 2>/dev/null
+# == Or in-shell command? ==
+Result=0.
 
-# exit
-case $? in
-  0) exit 0;;
-  *) print_usage_and_exit;;
-esac
+# Expect each argument to be /[+-]?([0-9]+|[0-9]+\.[0-9]*|\.[0-9]+)([eE][+-]?[0-9]+)?/
+for x in "$@"; do
+	# Trying to invoke an option?
+	case "$x" in --?*|-[!0-9]*)
+		print_usage_and_exit
+	esac
+
+	# Reject by first character.
+	case "$x" in ''|[!-+0-9.]*)
+		error_exit "not a number: $x"
+	esac
+
+	# /[+-]?([0-9]+|[0-9]+\.[0-9]*|\.[0-9]+)([eE][+-]?[0-9]+)?/
+	#  ^^^^^
+	sign=
+	case "$x" in [+-]*)
+		sign="$x"
+		x="${x#?}"
+		sign="${sign%"$x"}"
+	esac
+	case "$sign" in [+-]|'')
+		:
+	;;*)
+		error_exit "sign part syntax error, got $sign, remaining $x"
+	esac
+
+	# /[+-]?([0-9]+|[0-9]+\.[0-9]*|\.[0-9]+)([eE][+-]?[0-9]+)?/
+	#        ^^^^^^ ^^^^^^
+	integer_digits=
+	case "$x" in [0-9]*)
+		integer_digits="${x%%[!0-9]*}"
+		x="${x#"$integer_digits"}"
+	esac
+
+	# /[+-]?([0-9]+|[0-9]+\.[0-9]*|\.[0-9]+)([eE][+-]?[0-9]+)?/
+	#                     ^^       ^^
+	dot=
+	case "$x" in .*)
+		dot=.
+		x="${x#.}"
+	esac
+
+	# /[+-]?([0-9]+|[0-9]+\.[0-9]*|\.[0-9]+)([eE][+-]?[0-9]+)?/
+	#                       ^^^^^^   ^^^^^^
+	decimal_digits=
+	case "$x" in [0-9]*)
+		decimal_digits="${x%%[!0-9]*}"
+		x="${x#"${decimal_digits}"}"
+	esac
+
+	# /[+-]?([0-9]+|[0-9]+\.[0-9]*|\.[0-9]+)([eE][+-]?[0-9]+)?/
+	#       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+	case "${integer_digits:+I}${dot:+.}${decimal_digits:+D}" in I|I.|I.D|.D)
+		:
+	;;*)
+		error_exit "non-exponential part syntax error, got ${integer_digits}${dot}${decimal_digits}, remaining $x"
+	esac
+
+	# /[+-]?([0-9]+|[0-9]+\.[0-9]*|\.[0-9]+)([eE][+-]?[0-9]+)?/
+	#                                       ^^^^^^^^^^^^^^^^^^
+	exponential_sign=
+	exponential_digits=
+	case "$x" in [eE]*)
+		x="${x#[eE]}"
+		case "$x" in [+-]*)
+			exponential_sign="$x"
+			x="${x#[+-]}"
+			exponential_sign="${exponential_sign%"$x"}"
+		esac
+
+		exponential_digits="$x"
+		case "$exponential_digits" in ''|*[!0-9]*)
+			error_exit "exponential digits syntax error, got $exponential_digits"
+		esac
+	esac
+
+	case "${exponential_sign:+S}${exponential_digits:+D}" in ''|D|SD)
+		:
+	;;*)
+		error_exit "exponential part syntax error, got ${exponential_sign}${exponential_digits}"
+	esac
+	exponential="${exponential_sign}${exponential_digits:-0}"
+
+	# Now I parsed an argument.
+	# Create bc(1) statements.
+	_scale="${#decimal_digits} - ${exponential}"
+	_maybe_renew_scale="if ( $_scale > scale ) scale = $_scale"
+
+	_value="${sign}${integer_digits}.${decimal_digits}*10^($exponential)"
+
+	formula="$formula
+		$_maybe_renew_scale
+		s += $_value"
+done
+
+# Finally
+formula="$formula
+	s"
+
+printf '%s\n' "$formula" |
+bc -l |
+#
+# The long digits shall be in multiple lines. Making result as one line.
+tr -d '\\\n'; echo
+
+exit 0
