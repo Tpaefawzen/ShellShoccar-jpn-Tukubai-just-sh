@@ -21,6 +21,10 @@
 make [DESTDIR=dir] [PREFIX=prefix] {install|uninstall}
 ```
 
+Default DESTDIR is ""
+
+Default PREFIX is "$HOME/.local"
+
 [DESTDIR and PREFIX are explained here (Stack Overflow)](https://stackoverflow.com/questions/11307465/destdir-and-prefix-of-make)
 
 Details are in `configure` and `Makefile.in`.
