@@ -1,0 +1,48 @@
+.Dd November 16, 2023
+.Dt GYO 1
+.Os "ShellShoccar-jpn Tukubai"
+.Sh NAME
+.Nm gyo
+.Nd Count number of lines; synonym for wc -l
+.Sh SYNOPSIS
+.Nm gyo
+.Op Fl f
+.Op Ar FILE ...
+.Sh DESCRIPTION
+The
+.Nm gyo
+is the synonym for
+.D1 wc -l
+.Pp
+If
+.Ar FILE
+is not given or hyphen-minus
+.Pq Dq - ,
+is given, the standard input shall be used.
+.Sh OUTPUT FORMAT
+If
+.Fl f
+is given, for each
+.Ar FILE ,
+two fields of
+.Bl -enum 
+.It
+filename
+.It
+number of lines
+.El
+are output as
+.Xr name-format 5 ,
+which the order is different from
+.Xr wc 1 .
+If
+.Fl f
+is not given, for each
+.Ar FILE ,
+number of lines are output.
+.Sh SEE ALSO
+.so _man_template/this-is-ssj-tukubai.rf
+.Xr count 1 ,
+.Xr juni 1 ,
+.Xr rank 1 ,
+.Xr retu 1

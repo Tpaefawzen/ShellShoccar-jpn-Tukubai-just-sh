@@ -1,0 +1,25 @@
+.Dd February 10, 2024
+.Dt CALCLOCK 1
+.Os "ShellShoccar-jpn Tukubai"
+.Sh NAME
+.Nm calclock
+.Nd Time Format Converter Between YYYYMMDDhhmmss and UNIX time
+.Sh SYNOPSIS
+.Nm calclock
+.Op Cm + Ns Ar n Ns Cm h
+.Op Fl r
+.Ar F1 F2 ...
+.Ar FILE
+.Nm calclock
+.Fl d
+.Op Fl r
+.Ar STRING
+.Sh DESCRIPTION
+If
+.Fl r
+is NOT given, convert YYYYMMDDhhmmss time to UNIX time.
+If 
+.Fl r
+is given, convert UNIX time to YYYYMMDDhhmmss time.
+.Sh SEE ALSO
+.so _man_template/this-is-ssj-tukubai.rf
